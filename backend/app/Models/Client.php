@@ -12,8 +12,6 @@ class Client extends Model
         'name',
         'logo_url',
         'primary_color',
-        'cm360_advertiser_id',
-        'cm360_profile_id',
         'client_type',
         'is_active',
         'features',

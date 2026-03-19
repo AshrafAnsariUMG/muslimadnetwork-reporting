@@ -23,25 +23,33 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 ```
 /var/www/muslimadnetwork-reporting/
 ├── CLAUDE.md
-├── backend/                              # Laravel 13 API
+├── backend/
 │   ├── app/
 │   │   ├── Enums/
 │   │   │   ├── UserRole.php             # admin | client
-│   │   │   └── ClientType.php           # standard | conversion | multi_campaign
+│   │   │   ├── ClientType.php           # standard | conversion | multi_campaign
+│   │   │   └── CampaignStatus.php       # active | paused | ended | upcoming
 │   │   ├── Http/
 │   │   │   ├── Controllers/Api/
-│   │   │   │   ├── AuthController.php   # login, logout, me
-│   │   │   │   └── UmmahPassController.php # OAuth redirect + callback
+│   │   │   │   ├── AuthController.php
+│   │   │   │   ├── UmmahPassController.php
+│   │   │   │   └── Admin/
+│   │   │   │       ├── ClientController.php
+│   │   │   │       ├── UserController.php
+│   │   │   │       ├── CampaignController.php
+│   │   │   │       ├── ImpersonationController.php
+│   │   │   │       └── StatsController.php
 │   │   │   └── Middleware/
-│   │   │       └── RoleMiddleware.php   # 'role:admin' / 'role:client'
+│   │   │       └── RoleMiddleware.php
 │   │   └── Models/
 │   │       ├── User.php
 │   │       ├── Client.php
-│   │       └── Campaign.php
+│   │       ├── Campaign.php
+│   │       └── AdminAuditLog.php
 │   ├── config/
 │   │   ├── cors.php
 │   │   ├── sanctum.php
-│   │   └── services.php                 # includes ummahpass config
+│   │   └── services.php                 # cm360 + ummahpass service configs
 │   ├── database/
 │   │   ├── migrations/
 │   │   └── seeders/
@@ -49,20 +57,26 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 │   ├── routes/
 │   │   └── api.php
 │   └── .env
-└── frontend/                            # Next.js 14
+└── frontend/
     ├── app/
     │   ├── layout.tsx                   # AuthProvider + Inter font
-    │   ├── page.tsx                     # redirects to /login
-    │   ├── login/page.tsx               # login form + UmmahPass button
-    │   ├── dashboard/page.tsx           # RouteGuard role=client
-    │   └── admin/page.tsx               # RouteGuard role=admin
+    │   ├── page.tsx                     # → /login
+    │   ├── login/page.tsx
+    │   ├── dashboard/page.tsx           # RouteGuard role=client + impersonation banner
+    │   └── admin/
+    │       ├── layout.tsx               # Sidebar nav + top bar, RouteGuard role=admin
+    │       ├── page.tsx                 # Stats dashboard (4 stat cards)
+    │       ├── clients/page.tsx         # Client CRUD + impersonate
+    │       ├── users/page.tsx           # User CRUD + password generation
+    │       ├── campaigns/page.tsx       # Campaign CRUD + client filter
+    │       └── audit-log/page.tsx       # Placeholder
     ├── context/
-    │   └── AuthContext.tsx              # user, token, login(), logout(), fetchUser()
+    │   └── AuthContext.tsx              # + isImpersonating, stopImpersonation()
     ├── lib/
-    │   └── api.ts                       # axios instance with auth interceptors
+    │   └── api.ts
     ├── components/
     │   └── layout/
-    │       └── RouteGuard.tsx           # redirect logic by role
+    │       └── RouteGuard.tsx
     └── .env
 ```
 
@@ -92,8 +106,11 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 | `REDIS_PORT` | 6379 |
 | `SANCTUM_STATEFUL_DOMAINS` | 37.27.215.90 |
 | `CORS_ALLOWED_ORIGINS` | http://37.27.215.90:3001 |
-| `CM360_PROFILE_ID` | (to be filled) |
+| `CM360_PROFILE_ID` | Global MAN CM360 profile ID |
+| `CM360_ADVERTISER_ID` | Global MAN CM360 advertiser ID |
 | `CM360_REFRESH_TOKEN` | (to be filled) |
+| `CM360_OAUTH_CLIENT_ID` | CM360 OAuth client ID (to be filled in Session 4) |
+| `CM360_OAUTH_CLIENT_SECRET` | CM360 OAuth client secret (to be filled in Session 4) |
 | `UMMAHPASS_CLIENT_ID` | (to be filled) |
 | `UMMAHPASS_CLIENT_SECRET` | (to be filled) |
 | `UMMAHPASS_REDIRECT_URI` | http://37.27.215.90:8001/api/auth/ummahpass/callback |
@@ -111,8 +128,8 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 | Table | Description |
 |-------|-------------|
 | `users` | Portal users — admin or client role; may auth via UmmahPass or password |
-| `clients` | Advertiser clients with CM360 config and feature flags |
-| `campaigns` | CM360 campaigns linked to clients |
+| `clients` | Advertiser clients — no longer stores CM360 IDs (those are global in .env) |
+| `campaigns` | CM360 campaigns linked to clients; optionally have `cm360_activity_id` for conversion tracking |
 | `report_cache` | Cached CM360 report payloads with expiry |
 | `offers` | Promotional offers shown in portal (global or per-client) |
 | `offer_dismissals` | Tracks which users dismissed which offers |
@@ -126,24 +143,58 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 
 ## API Routes
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| POST | `/api/auth/login` | Public | Email + password login |
-| GET | `/api/auth/ummahpass/redirect` | Public | Redirect to UmmahPass OAuth |
-| GET | `/api/auth/ummahpass/callback` | Public | OAuth callback handler |
-| POST | `/api/auth/logout` | sanctum | Revoke current token |
-| GET | `/api/auth/me` | sanctum | Return authenticated user |
-| GET | `/api/admin/test` | sanctum + role:admin | Admin access test |
-| GET | `/api/client/test` | sanctum + role:client | Client access test |
+### Public
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/auth/login` | Email + password login |
+| GET | `/api/auth/ummahpass/redirect` | Redirect to UmmahPass OAuth |
+| GET | `/api/auth/ummahpass/callback` | OAuth callback handler |
+
+### Sanctum (any authenticated user)
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/auth/logout` | Revoke current token |
+| GET | `/api/auth/me` | Return authenticated user |
+| POST | `/api/admin/impersonate/stop` | Stop impersonation (accessible by client token) |
+
+### Admin only (sanctum + role:admin)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/admin/stats` | Dashboard stats |
+| GET/POST | `/api/admin/clients` | List / create clients |
+| GET/PUT/DELETE | `/api/admin/clients/{id}` | Show / update / deactivate client |
+| GET/POST | `/api/admin/users` | List / create users |
+| PUT/DELETE | `/api/admin/users/{id}` | Update / delete user |
+| POST | `/api/admin/users/{id}/reset-password` | Reset user password |
+| GET/POST | `/api/admin/campaigns` | List / create campaigns |
+| PUT/DELETE | `/api/admin/campaigns/{id}` | Update / delete campaign |
+| POST | `/api/admin/impersonate/{client_id}` | Start client impersonation |
+
+### Client only (sanctum + role:client)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/client/test` | Client access test |
 
 ---
 
-## Auth Architecture
+## CM360 Data Model
 
-- **Token-based**: Sanctum personal access tokens, sent as `Authorization: Bearer <token>`
-- **Frontend storage**: Token stored in `localStorage` under key `auth_token`
-- **Role enforcement**: `RoleMiddleware` on backend; `RouteGuard` component on frontend
-- **UmmahPass**: Standard OAuth2 flow — redirect → callback → create/update user → return token
+- MAN has **one global CM360 Profile ID** and **one CM360 Advertiser ID** — stored in `.env` as `CM360_PROFILE_ID` and `CM360_ADVERTISER_ID`, accessed via `config('services.cm360.*')`
+- All client campaigns live under this single advertiser
+- Each `campaign` row maps to a client via `cm360_campaign_id`
+- Conversion tracking is per-campaign: `has_conversion_tracking` (bool) + `cm360_activity_id` (nullable string)
+- CM360 OAuth credentials: `CM360_OAUTH_CLIENT_ID` + `CM360_OAUTH_CLIENT_SECRET` (to be filled in Session 4)
+
+---
+
+## Auth & Impersonation Architecture
+
+- **Token-based**: Sanctum personal access tokens, `Authorization: Bearer <token>`
+- **Frontend storage**: `auth_token` in localStorage (active token)
+- **Impersonation flow**:
+  - Start: stores `admin_token` (backup), sets `auth_token` = impersonation token, sets `impersonation_token` flag, opens `/dashboard` in new tab
+  - Stop: restores `auth_token` from `admin_token`, clears `impersonation_token` + `admin_token`, redirects to `/admin/clients`
+- **Role enforcement**: `RoleMiddleware` on backend; `RouteGuard` on frontend
 - **Admin seed**: `admin@muslimadnetwork.com` / `Admin@1234`
 
 ---
@@ -167,8 +218,9 @@ cd /var/www/muslimadnetwork-reporting/backend
 # Run migrations
 php artisan migrate --force
 
-# Clear and cache config
+# Clear and cache config + routes
 php artisan config:clear && php artisan config:cache
+php artisan route:clear && php artisan route:cache
 
 # Clear all caches
 php artisan optimize:clear
@@ -205,5 +257,5 @@ pm2 logs muslimadnetwork-backend
 1. **Never run git commands.** Always say "Ready to push" when a task is complete.
 2. When done with any task, say **"Ready to push"** and stop.
 3. Do not set up PM2 or Nginx — the user manages that manually.
-4. Backend runs via PHP built-in server or PHP-FPM behind Nginx on port 8001.
+4. Backend runs via PHP-FPM behind Nginx on port 8001.
 5. Frontend runs via `next start` on port 3001.

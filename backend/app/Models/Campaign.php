@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\CampaignStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -17,14 +18,20 @@ class Campaign extends Model
         'contracted_impressions',
         'contracted_clicks',
         'is_primary',
+        'has_conversion_tracking',
+        'cm360_activity_id',
     ];
 
     protected function casts(): array
     {
         return [
+            'status' => CampaignStatus::class,
             'start_date' => 'date',
             'end_date' => 'date',
             'is_primary' => 'boolean',
+            'has_conversion_tracking' => 'boolean',
+            'contracted_impressions' => 'integer',
+            'contracted_clicks' => 'integer',
         ];
     }
 

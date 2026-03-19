@@ -42,4 +42,12 @@ return [
         'base_url' => 'https://ummahpass.com',
     ],
 
+    'cm360' => [
+        'profile_id' => env('CM360_PROFILE_ID'),
+        'advertiser_id' => env('CM360_ADVERTISER_ID'),
+        'refresh_token' => env('CM360_REFRESH_TOKEN'),
+        'client_id' => env('CM360_OAUTH_CLIENT_ID'),
+        'client_secret' => env('CM360_OAUTH_CLIENT_SECRET'),
+    ],
+
 ];
