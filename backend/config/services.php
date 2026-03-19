@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    'ummahpass' => [
+        'client_id' => env('UMMAHPASS_CLIENT_ID'),
+        'client_secret' => env('UMMAHPASS_CLIENT_SECRET'),
+        'redirect_uri' => env('UMMAHPASS_REDIRECT_URI'),
+        'base_url' => 'https://ummahpass.com',
+    ],
+
 ];

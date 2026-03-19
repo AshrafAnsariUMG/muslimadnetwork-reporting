@@ -7,12 +7,12 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 
 ## Stack & Ports
 
-| Layer    | Tech                        | Port |
-|----------|-----------------------------|------|
-| Backend  | Laravel 13 (PHP 8.3)        | 8001 |
-| Frontend | Next.js 14 (App Router, TS) | 3001 |
-| Database | MySQL                        | 3306 |
-| Cache/Queue/Session | Redis          | 6379 |
+| Layer               | Tech                        | Port |
+|---------------------|-----------------------------|------|
+| Backend             | Laravel 13 (PHP 8.3)        | 8001 |
+| Frontend            | Next.js 14 (App Router, TS) | 3001 |
+| Database            | MySQL                        | 3306 |
+| Cache/Queue/Session | Redis                        | 6379 |
 
 > Note: Laravel 13 was installed (latest available at scaffold time). Task spec referenced Laravel 11.
 
@@ -23,25 +23,46 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 ```
 /var/www/muslimadnetwork-reporting/
 ├── CLAUDE.md
-├── backend/                        # Laravel 13 API
+├── backend/                              # Laravel 13 API
 │   ├── app/
-│   │   ├── Http/Controllers/
-│   │   ├── Models/
-│   │   └── ...
+│   │   ├── Enums/
+│   │   │   ├── UserRole.php             # admin | client
+│   │   │   └── ClientType.php           # standard | conversion | multi_campaign
+│   │   ├── Http/
+│   │   │   ├── Controllers/Api/
+│   │   │   │   ├── AuthController.php   # login, logout, me
+│   │   │   │   └── UmmahPassController.php # OAuth redirect + callback
+│   │   │   └── Middleware/
+│   │   │       └── RoleMiddleware.php   # 'role:admin' / 'role:client'
+│   │   └── Models/
+│   │       ├── User.php
+│   │       ├── Client.php
+│   │       └── Campaign.php
 │   ├── config/
-│   │   └── sanctum.php
+│   │   ├── cors.php
+│   │   ├── sanctum.php
+│   │   └── services.php                 # includes ummahpass config
 │   ├── database/
-│   │   └── migrations/
+│   │   ├── migrations/
+│   │   └── seeders/
+│   │       └── AdminSeeder.php          # admin@muslimadnetwork.com / Admin@1234
 │   ├── routes/
-│   │   ├── api.php
-│   │   └── web.php
+│   │   └── api.php
 │   └── .env
-└── frontend/                       # Next.js 14
+└── frontend/                            # Next.js 14
     ├── app/
-    │   ├── page.tsx               → redirects to /login
-    │   ├── login/page.tsx
-    │   ├── dashboard/page.tsx
-    │   └── admin/page.tsx
+    │   ├── layout.tsx                   # AuthProvider + Inter font
+    │   ├── page.tsx                     # redirects to /login
+    │   ├── login/page.tsx               # login form + UmmahPass button
+    │   ├── dashboard/page.tsx           # RouteGuard role=client
+    │   └── admin/page.tsx               # RouteGuard role=admin
+    ├── context/
+    │   └── AuthContext.tsx              # user, token, login(), logout(), fetchUser()
+    ├── lib/
+    │   └── api.ts                       # axios instance with auth interceptors
+    ├── components/
+    │   └── layout/
+    │       └── RouteGuard.tsx           # redirect logic by role
     └── .env
 ```
 
@@ -74,6 +95,7 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 | `CM360_PROFILE_ID` | (to be filled) |
 | `CM360_REFRESH_TOKEN` | (to be filled) |
 | `UMMAHPASS_CLIENT_ID` | (to be filled) |
+| `UMMAHPASS_CLIENT_SECRET` | (to be filled) |
 | `UMMAHPASS_REDIRECT_URI` | http://37.27.215.90:8001/api/auth/ummahpass/callback |
 
 ### Frontend (`frontend/.env`)
@@ -102,29 +124,68 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 
 ---
 
+## API Routes
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/api/auth/login` | Public | Email + password login |
+| GET | `/api/auth/ummahpass/redirect` | Public | Redirect to UmmahPass OAuth |
+| GET | `/api/auth/ummahpass/callback` | Public | OAuth callback handler |
+| POST | `/api/auth/logout` | sanctum | Revoke current token |
+| GET | `/api/auth/me` | sanctum | Return authenticated user |
+| GET | `/api/admin/test` | sanctum + role:admin | Admin access test |
+| GET | `/api/client/test` | sanctum + role:client | Client access test |
+
+---
+
+## Auth Architecture
+
+- **Token-based**: Sanctum personal access tokens, sent as `Authorization: Bearer <token>`
+- **Frontend storage**: Token stored in `localStorage` under key `auth_token`
+- **Role enforcement**: `RoleMiddleware` on backend; `RouteGuard` component on frontend
+- **UmmahPass**: Standard OAuth2 flow — redirect → callback → create/update user → return token
+- **Admin seed**: `admin@muslimadnetwork.com` / `Admin@1234`
+
+---
+
+## Brand Colors
+
+| Name | Hex |
+|------|-----|
+| Primary Green | `#1a4a2e` |
+| Primary Red | `#e8192c` |
+| Font | Inter (Google Fonts) |
+
+---
+
 ## Key Commands
 
 ### Backend
 ```bash
+cd /var/www/muslimadnetwork-reporting/backend
+
 # Run migrations
-cd /var/www/muslimadnetwork-reporting/backend && php artisan migrate --force
+php artisan migrate --force
+
+# Clear and cache config
+php artisan config:clear && php artisan config:cache
 
 # Clear all caches
 php artisan optimize:clear
 
-# Clear config/route/view cache individually
-php artisan config:clear
-php artisan route:clear
-php artisan view:clear
-
 # Re-cache for production
 php artisan optimize
+
+# Seed admin user
+php artisan db:seed --class=AdminSeeder --force
 ```
 
 ### Frontend
 ```bash
+cd /var/www/muslimadnetwork-reporting/frontend
+
 # Build
-cd /var/www/muslimadnetwork-reporting/frontend && npm run build
+npm run build
 
 # Dev server
 npm run dev -- -p 3001
