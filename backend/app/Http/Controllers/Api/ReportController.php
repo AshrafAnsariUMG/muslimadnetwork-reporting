@@ -7,6 +7,7 @@ use App\Models\Campaign;
 use App\Services\ReportCacheService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class ReportController extends Controller
 {
@@ -41,7 +42,12 @@ class ReportController extends Controller
         [$campaign, $dateFrom, $dateTo] = $this->resolveParams($request);
 
         if (!$campaign->has_conversion_tracking) {
-            return response()->json(['error' => 'Conversion tracking not enabled for this campaign.'], 422);
+            return response()->json(['available' => false]);
+        }
+
+        if (empty($campaign->cm360_activity_id)) {
+            Log::warning('Conversion requested but cm360_activity_id is missing', ['campaign_id' => $campaign->id]);
+            return response()->json(['available' => false]);
         }
 
         return response()->json($this->cache->get($campaign, $dateFrom, $dateTo, 'conversion'));

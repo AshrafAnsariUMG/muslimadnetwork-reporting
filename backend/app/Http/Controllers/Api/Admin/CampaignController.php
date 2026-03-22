@@ -32,6 +32,8 @@ class CampaignController extends Controller
             'contracted_impressions' => ['nullable', 'integer', 'min:0'],
             'contracted_clicks' => ['nullable', 'integer', 'min:0'],
             'is_primary' => ['boolean'],
+            'has_conversion_tracking' => ['boolean'],
+            'cm360_activity_id' => ['nullable', 'string', 'max:255'],
         ]);
 
         $campaign = Campaign::create($data);
@@ -54,6 +56,8 @@ class CampaignController extends Controller
             'contracted_impressions' => ['nullable', 'integer', 'min:0'],
             'contracted_clicks' => ['nullable', 'integer', 'min:0'],
             'is_primary' => ['boolean'],
+            'has_conversion_tracking' => ['sometimes', 'boolean'],
+            'cm360_activity_id' => ['nullable', 'string', 'max:255'],
         ]);
 
         $campaign->update($data);
