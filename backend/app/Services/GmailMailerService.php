@@ -43,7 +43,7 @@ class GmailMailerService
             $rawMime = implode("\r\n", [
                 'From: Muslim Ad Network <' . $from . '>',
                 'To: ' . $to,
-                'Subject: ' . $subject,
+                'Subject: =?UTF-8?B?' . base64_encode($subject) . '?=',
                 'MIME-Version: 1.0',
                 'Content-Type: text/html; charset=utf-8',
                 '',
