@@ -1,11 +1,13 @@
 <?php
 
+use App\Http\Controllers\Api\Admin\CacheController;
 use App\Http\Controllers\Api\Admin\CampaignController;
 use App\Http\Controllers\Api\Admin\ClientController;
 use App\Http\Controllers\Api\Admin\ImpersonationController;
 use App\Http\Controllers\Api\Admin\StatsController;
 use App\Http\Controllers\Api\Admin\UserController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\UmmahPassController;
 use Illuminate\Support\Facades\Route;
 
@@ -53,6 +55,19 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     // Impersonation start
     Route::post('/admin/impersonate/{client_id}', [ImpersonationController::class, 'start']);
 
+    // Cache management
+    Route::post('/admin/cache/invalidate/{campaign_id}', [CacheController::class, 'invalidate']);
+
+    // CM360 test
+    Route::get('/admin/cm360-test', function () {
+        try {
+            $service = app(\App\Services\CM360Service::class);
+            return response()->json(['status' => 'ok', 'message' => 'CM360 service initialized successfully.']);
+        } catch (\Throwable $e) {
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+        }
+    });
+
     // Test
     Route::get('/admin/test', fn () => response()->json(['message' => 'admin access confirmed']));
 });
@@ -60,4 +75,12 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
 // Client only routes
 Route::middleware(['auth:sanctum', 'role:client'])->group(function () {
     Route::get('/client/test', fn () => response()->json(['message' => 'client access confirmed']));
+
+    // Reports
+    Route::get('/reports/campaigns', [ReportController::class, 'campaigns']);
+    Route::get('/reports/summary',   [ReportController::class, 'summary']);
+    Route::get('/reports/device',    [ReportController::class, 'device']);
+    Route::get('/reports/site',      [ReportController::class, 'site']);
+    Route::get('/reports/creative',  [ReportController::class, 'creative']);
+    Route::get('/reports/conversion',[ReportController::class, 'conversion']);
 });

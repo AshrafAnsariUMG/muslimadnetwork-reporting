@@ -33,18 +33,24 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 │   │   │   ├── Controllers/Api/
 │   │   │   │   ├── AuthController.php
 │   │   │   │   ├── UmmahPassController.php
+│   │   │   │   ├── ReportController.php          # Client report endpoints
 │   │   │   │   └── Admin/
 │   │   │   │       ├── ClientController.php
 │   │   │   │       ├── UserController.php
 │   │   │   │       ├── CampaignController.php
 │   │   │   │       ├── ImpersonationController.php
-│   │   │   │       └── StatsController.php
+│   │   │   │       ├── StatsController.php
+│   │   │   │       └── CacheController.php       # Manual cache invalidation
 │   │   │   └── Middleware/
 │   │   │       └── RoleMiddleware.php
+│   │   ├── Services/
+│   │   │   ├── CM360Service.php              # Google CM360 API integration
+│   │   │   └── ReportCacheService.php        # TTL caching layer over CM360Service
 │   │   └── Models/
 │   │       ├── User.php
 │   │       ├── Client.php
 │   │       ├── Campaign.php
+│   │       ├── ReportCache.php
 │   │       └── AdminAuditLog.php
 │   ├── config/
 │   │   ├── cors.php
@@ -108,9 +114,9 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 | `CORS_ALLOWED_ORIGINS` | http://37.27.215.90:3001 |
 | `CM360_PROFILE_ID` | Global MAN CM360 profile ID |
 | `CM360_ADVERTISER_ID` | Global MAN CM360 advertiser ID |
-| `CM360_REFRESH_TOKEN` | (to be filled) |
-| `CM360_OAUTH_CLIENT_ID` | CM360 OAuth client ID (to be filled in Session 4) |
-| `CM360_OAUTH_CLIENT_SECRET` | CM360 OAuth client secret (to be filled in Session 4) |
+| `CM360_REFRESH_TOKEN` | Set and verified working |
+| `CM360_OAUTH_CLIENT_ID` | CM360 OAuth client ID |
+| `CM360_OAUTH_CLIENT_SECRET` | CM360 OAuth client secret |
 | `UMMAHPASS_CLIENT_ID` | (to be filled) |
 | `UMMAHPASS_CLIENT_SECRET` | (to be filled) |
 | `UMMAHPASS_REDIRECT_URI` | http://37.27.215.90:8001/api/auth/ummahpass/callback |
@@ -169,11 +175,21 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 | GET/POST | `/api/admin/campaigns` | List / create campaigns |
 | PUT/DELETE | `/api/admin/campaigns/{id}` | Update / delete campaign |
 | POST | `/api/admin/impersonate/{client_id}` | Start client impersonation |
+| POST | `/api/admin/cache/invalidate/{campaign_id}` | Invalidate all cached reports for campaign |
+| GET | `/api/admin/cm360-test` | Test CM360 service auth |
 
 ### Client only (sanctum + role:client)
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/client/test` | Client access test |
+| GET | `/api/reports/campaigns` | List client's campaigns |
+| GET | `/api/reports/summary` | Summary report (impressions, clicks, CTR) |
+| GET | `/api/reports/device` | Device breakdown |
+| GET | `/api/reports/site` | Site breakdown |
+| GET | `/api/reports/creative` | Creative breakdown |
+| GET | `/api/reports/conversion` | Conversion report (requires has_conversion_tracking) |
+
+> Report endpoints accept query params: `date_from` (Y-m-d), `date_to` (Y-m-d), and optionally `campaign_id` (required for multi_campaign clients).
 
 ---
 
@@ -183,7 +199,15 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 - All client campaigns live under this single advertiser
 - Each `campaign` row maps to a client via `cm360_campaign_id`
 - Conversion tracking is per-campaign: `has_conversion_tracking` (bool) + `cm360_activity_id` (nullable string)
-- CM360 OAuth credentials: `CM360_OAUTH_CLIENT_ID` + `CM360_OAUTH_CLIENT_SECRET` (to be filled in Session 4)
+- CM360 OAuth credentials: `CM360_OAUTH_CLIENT_ID` + `CM360_OAUTH_CLIENT_SECRET` (set in .env)
+
+## CM360 Service Architecture
+
+- **`CM360Service`** — Singleton. Initializes `Google\Client` on construction via `fetchAccessTokenWithRefreshToken()`. Each public method builds a `Google\Service\Dfareporting\Report`, calls `runReport()` which does insert→run→poll(60×2s)→download CSV→parse. Cleans up the CM360 report in `finally`. Methods: `fetchSummaryReport`, `fetchDeviceBreakdown`, `fetchSiteBreakdown`, `fetchCreativeBreakdown`, `fetchConversionReport`.
+
+- **`ReportCacheService`** — Singleton. Injects `CM360Service`. `get()` checks `report_cache` table first; if fresh (expires_at in future), returns cached payload. Otherwise fetches from CM360 and upserts cache. TTL: 2h for active campaigns, 24h for others. On CM360 error, falls back to stale cache if available; re-throws if no cache exists. `invalidate()` deletes all cache rows for a campaign.
+
+- **Report caching key**: `(campaign_id, date_from, date_to, report_type)` — unique combination.
 
 ---
 

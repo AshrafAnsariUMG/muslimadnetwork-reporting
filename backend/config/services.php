@@ -48,6 +48,7 @@ return [
         'refresh_token' => env('CM360_REFRESH_TOKEN'),
         'client_id' => env('CM360_OAUTH_CLIENT_ID'),
         'client_secret' => env('CM360_OAUTH_CLIENT_SECRET'),
+        'redirect_uri' => env('CM360_REDIRECT_URI'),
     ],
 
 ];
