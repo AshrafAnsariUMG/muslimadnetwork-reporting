@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\Admin\UserController;
 use App\Http\Controllers\Api\Admin\VisibilityController as AdminVisibilityController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\Client\VisibilityController as ClientVisibilityController;
+use App\Http\Controllers\Api\GmailAuthController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\UmmahPassController;
 use Illuminate\Support\Facades\Route;
@@ -17,6 +18,10 @@ use Illuminate\Support\Facades\Route;
 Route::post('/auth/login', [AuthController::class, 'login']);
 Route::get('/auth/ummahpass/redirect', [UmmahPassController::class, 'redirect']);
 Route::get('/auth/ummahpass/callback', [UmmahPassController::class, 'callback']);
+
+// Temporary Gmail OAuth flow — remove after refresh token is obtained
+Route::get('/auth/gmail/connect', [GmailAuthController::class, 'connect']);
+Route::get('/auth/gmail/callback', [GmailAuthController::class, 'callback']);
 
 // Protected routes (sanctum, no role restriction)
 // NOTE: /admin/impersonate/stop must be registered before /admin/impersonate/{client_id}
