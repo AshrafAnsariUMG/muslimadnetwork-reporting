@@ -41,6 +41,13 @@ class ReportController extends Controller
     {
         [$campaign, $dateFrom, $dateTo] = $this->resolveParams($request);
 
+        $client = $request->user()->client;
+
+        // Client type is the master switch — standard clients never see conversion data
+        if ($client->client_type->value === 'standard') {
+            return response()->json(['available' => false]);
+        }
+
         if (!$campaign->has_conversion_tracking) {
             return response()->json(['available' => false]);
         }

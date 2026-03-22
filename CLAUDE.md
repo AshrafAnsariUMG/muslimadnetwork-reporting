@@ -231,6 +231,7 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 - All client campaigns live under this single advertiser
 - Each `campaign` row maps to a client via `cm360_campaign_id`
 - Conversion tracking is per-campaign: `has_conversion_tracking` (bool) + `cm360_activity_id` (nullable string)
+- **Conversion visibility rule**: conversion data only shows when BOTH (1) `client.client_type` is `conversion` or `multi_campaign` (NOT `standard`) AND (2) `campaign.has_conversion_tracking = true`. Client type is the master switch — enforced in both `ReportController::conversion()` (backend) and `conversionEnabled` flag in `dashboard/page.tsx` (frontend).
 - CM360 OAuth credentials: `CM360_OAUTH_CLIENT_ID` + `CM360_OAUTH_CLIENT_SECRET` (set in .env)
 
 ## Visibility Control System
@@ -255,6 +256,7 @@ Admins can hide/show entire sections or individual table rows per client while i
   - **CSV parsing**: CM360 CSVs start with the report name (no prefix), then metadata, then a `Report Fields` marker line (no colon), then actual column headers, then data rows, then `Grand Total:`. The parser seeks the `Report Fields` marker and uses the next line as headers.
   - **Confirmed CM360 column names**: `Campaign`, `Impressions`, `Clicks`, `Click Rate` (metrics); `Platform Type` (device); `Site (CM360)` (site); `Creative`, `Creative Pixel Size` (creative — note: NOT "Creative Size").
   - **`files->get($reportId, $fileId)`** — no profile ID (top-level files resource). Profile ID is only needed for `reports->insert/run/delete`.
+  - **Conversion report specifics**: Uses STANDARD report type. Dimension: `activity`. Filter: `dimensionName='activity'`, id=`cm360_activity_id`, matchType=`EXACT`. No campaign filter — activity filter only. Metrics: `['totalConversions', 'totalConversionsRevenue']`. Revenue is parsed from the Grand Total row in the raw CSV (not from data rows). CM360 returns conversion counts as decimals (e.g. `"37.00"`) — must parse as float then round to int. Uses `runReportRaw()` (returns raw CSV string) + `normalizeConversionFromCsv()` instead of the standard `runReport()` + `normalizeXxx()` pattern.
 
 - **`ReportCacheService`** — Singleton. Injects `CM360Service`. `get()` checks `report_cache` table first; if fresh (expires_at in future), returns cached payload. Otherwise fetches from CM360 and upserts cache. TTL: 2h for active campaigns, 24h for others. On CM360 error, falls back to stale cache if available; re-throws if no cache exists. `invalidate()` deletes all cache rows for a campaign.
 
