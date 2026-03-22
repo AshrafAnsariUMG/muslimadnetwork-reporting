@@ -68,7 +68,9 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
     │   ├── layout.tsx                   # AuthProvider + Inter font
     │   ├── page.tsx                     # → /login
     │   ├── login/page.tsx
-    │   ├── dashboard/page.tsx           # RouteGuard role=client + impersonation banner
+    │   ├── dashboard/
+    │   │   ├── layout.tsx               # Max-width container, white bg, no sidebar
+    │   │   └── page.tsx                 # Full reporting dashboard — summary, pacing, device/site/creative breakdowns
     │   └── admin/
     │       ├── layout.tsx               # Sidebar nav + top bar, RouteGuard role=admin
     │       ├── page.tsx                 # Stats dashboard (4 stat cards)
@@ -78,11 +80,24 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
     │       └── audit-log/page.tsx       # Placeholder
     ├── context/
     │   └── AuthContext.tsx              # + isImpersonating, stopImpersonation()
+    ├── hooks/
+    │   └── useReport.ts                 # Generic report data hook (type, dateFrom, dateTo, campaignId)
+    ├── types/
+    │   └── reports.ts                   # TS interfaces: SummaryReport, DeviceRow, SiteRow, CreativeRow, ConversionReport, Campaign, Client
     ├── lib/
-    │   └── api.ts
+    │   ├── api.ts
+    │   └── dateUtils.ts                 # getDefaultDateRange, formatDate, formatNumber, formatCTR, getPacingPercentage
     ├── components/
-    │   └── layout/
-    │       └── RouteGuard.tsx
+    │   ├── layout/
+    │   │   └── RouteGuard.tsx
+    │   └── dashboard/
+    │       ├── StatCard.tsx             # label + value card
+    │       ├── DateRangePicker.tsx      # Preset buttons + custom date inputs
+    │       ├── PacingBar.tsx            # Impression pacing progress bar with color coding
+    │       ├── DeviceBreakdownTable.tsx # Device rows with inline bars
+    │       ├── SiteBreakdownTable.tsx   # Site rows, top 10 + show all
+    │       ├── CreativeBreakdownTable.tsx # Creative rows, top 10 + show all
+    │       └── ConversionCard.tsx       # Renders nothing if available=false
     └── .env
 ```
 

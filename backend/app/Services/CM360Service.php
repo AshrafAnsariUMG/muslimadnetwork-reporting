@@ -58,6 +58,7 @@ class CM360Service
     {
         $report = $this->buildStandardReport('MAN-Summary', $dateFrom, $dateTo);
         $criteria = $report->getCriteria();
+        $criteria->setDimensions([$this->makeDimension('campaign')]);
         $criteria->setMetricNames(['impressions', 'clicks', 'clickRate']);
         $this->addCampaignFilter($criteria, $campaign->cm360_campaign_id);
         $report->setCriteria($criteria);
@@ -232,7 +233,7 @@ class CM360Service
                 }
 
                 sleep(2);
-                $file = $this->service->files->get($this->profileId, $reportId, $fileId);
+                $file = $this->service->files->get($reportId, $fileId);
             }
 
             if ($file->getStatus() !== 'REPORT_AVAILABLE') {
