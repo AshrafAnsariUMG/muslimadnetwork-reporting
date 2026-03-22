@@ -40,7 +40,8 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 │   │   │   │       ├── UserController.php
 │   │   │   │       ├── CampaignController.php
 │   │   │   │       ├── ImpersonationController.php
-│   │   │   │       ├── StatsController.php
+│   │   │   │       ├── StatsController.php        # total_clients, total_users, total_campaigns, campaigns_by_status, top_clients, recent_activity
+│   │   │   │       ├── AuditLogController.php    # GET /api/admin/audit-log; paginated 50/page; filters: admin_id, action, date_from, date_to
 │   │   │   │       ├── CacheController.php       # Manual cache invalidation
 │   │   │   │       ├── OnboardingController.php  # Send onboarding email (resets password + emails credentials)
 │   │   │   │       └── VisibilityController.php  # Admin visibility CRUD (overview/show/upsert/reset)
@@ -91,7 +92,7 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
     │       ├── users/page.tsx           # User CRUD + password generation
     │       ├── campaigns/page.tsx       # Campaign CRUD + client filter
     │       ├── visibility/page.tsx      # Visibility management — overview cards + per-client accordion panel
-    │       └── audit-log/page.tsx       # Placeholder
+    │       └── audit-log/page.tsx       # Full audit log: filters (date/action/admin), paginated table (50/page), expandable metadata, CSV export
     ├── context/
     │   └── AuthContext.tsx              # + isImpersonating, stopImpersonation()
     ├── hooks/
@@ -109,6 +110,7 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
     │       ├── StatCard.tsx             # label + value card
     │       ├── DateRangePicker.tsx      # Preset buttons + custom date inputs
     │       ├── PacingBar.tsx            # Impression pacing progress bar with color coding
+    │       ├── CampaignSwitcher.tsx     # Horizontal pill tabs for multi_campaign clients; only renders when client_type=multi_campaign && campaigns>1
     │       ├── DeviceBreakdownChart.tsx # Recharts doughnut chart; colored by device type; custom tooltip; legend with % share
     │       ├── DomainBreakdownCards.tsx # Top-10 card grid (2-col desktop); impression share bar; "View All" modal with search
     │       ├── AppBreakdownCards.tsx   # Same as DomainBreakdownCards but purple rank circles; "View All" modal with search
@@ -221,6 +223,7 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 | POST | `/api/admin/impersonate/{client_id}` | Start client impersonation |
 | POST | `/api/admin/cache/invalidate/{campaign_id}` | Invalidate all cached reports for campaign |
 | GET | `/api/admin/cm360-test` | Test CM360 service auth |
+| GET | `/api/admin/audit-log` | Paginated audit log; filters: admin_id, action, date_from, date_to |
 | GET | `/api/admin/visibility/overview` | Summary of all clients' hidden sections/rows |
 | GET | `/api/admin/visibility/{client_id}` | Get grouped visibility settings for a client |
 | POST | `/api/admin/visibility/{client_id}` | Upsert a visibility setting `{ section, level, row_key, is_hidden }` |

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\Admin\AuditLogController;
 use App\Http\Controllers\Api\Admin\CacheController;
 use App\Http\Controllers\Api\Admin\CampaignController;
 use App\Http\Controllers\Api\Admin\ClientController;
@@ -37,6 +38,9 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
 
     // Stats
     Route::get('/admin/stats', [StatsController::class, 'index']);
+
+    // Audit log
+    Route::get('/admin/audit-log', [AuditLogController::class, 'index']);
 
     // Clients
     Route::get('/admin/clients', [ClientController::class, 'index']);

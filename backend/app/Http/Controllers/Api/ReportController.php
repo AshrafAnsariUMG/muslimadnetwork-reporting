@@ -69,8 +69,8 @@ class ReportController extends Controller
         }
 
         $campaigns = Campaign::where('client_id', $client->id)
-            ->orderByDesc('is_primary')
-            ->orderBy('name')
+            ->orderByRaw("FIELD(status, 'active', 'upcoming', 'paused', 'ended')")
+            ->orderByDesc('start_date')
             ->get(['id', 'name', 'cm360_campaign_id', 'status', 'start_date', 'end_date',
                    'contracted_impressions', 'contracted_clicks', 'is_primary', 'has_conversion_tracking']);
 
