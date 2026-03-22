@@ -68,13 +68,8 @@ class CM360Service
 
     public function fetchSiteBreakdown(Campaign $campaign, string $dateFrom, string $dateTo): array
     {
-        $domainRows = $this->runReport($this->buildDomainReport($campaign, $dateFrom, $dateTo));
-        $appRows    = $this->runReport($this->buildAppReport($campaign, $dateFrom, $dateTo));
-
-        return [
-            'domains' => $this->normalizeDomains($domainRows),
-            'apps'    => $this->normalizeApps($appRows),
-        ];
+        $rows = $this->runReport($this->buildSiteReport($campaign, $dateFrom, $dateTo));
+        return $this->normalizeSiteBreakdown($rows);
     }
 
     public function fetchCreativeBreakdown(Campaign $campaign, string $dateFrom, string $dateTo): array
@@ -111,22 +106,14 @@ class CM360Service
         return $report;
     }
 
-    private function buildDomainReport(Campaign $campaign, string $dateFrom, string $dateTo): Report
+    private function buildSiteReport(Campaign $campaign, string $dateFrom, string $dateTo): Report
     {
-        $report = $this->buildStandardReport('MAN-Domain', $dateFrom, $dateTo);
+        $report = $this->buildStandardReport('MAN-Site', $dateFrom, $dateTo);
         $criteria = $report->getCriteria();
-        $criteria->setDimensions([$this->makeDimension('domain')]);
-        $criteria->setMetricNames(['impressions', 'clicks', 'clickRate']);
-        $this->addCampaignFilter($criteria, $campaign->cm360_campaign_id);
-        $report->setCriteria($criteria);
-        return $report;
-    }
-
-    private function buildAppReport(Campaign $campaign, string $dateFrom, string $dateTo): Report
-    {
-        $report = $this->buildStandardReport('MAN-App', $dateFrom, $dateTo);
-        $criteria = $report->getCriteria();
-        $criteria->setDimensions([$this->makeDimension('app')]);
+        $criteria->setDimensions([
+            $this->makeDimension('domain'),
+            $this->makeDimension('app'),
+        ]);
         $criteria->setMetricNames(['impressions', 'clicks', 'clickRate']);
         $this->addCampaignFilter($criteria, $campaign->cm360_campaign_id);
         $report->setCriteria($criteria);
@@ -184,36 +171,72 @@ class CM360Service
         ], $rows);
     }
 
-    private function normalizeDomains(array $rows): array
+    private function normalizeSiteBreakdown(array $rows): array
     {
-        $out = [];
+        // Aggregate by display name, tracking whether each is a domain or app
+        $buckets = []; // displayName => ['impressions'=>int, 'clicks'=>int, 'is_app'=>bool]
+
         foreach ($rows as $row) {
             $domain = $this->extractValue($row, ['Domain', 'domain']);
-            if ($domain === '' || $domain === '(not set)') continue;
-            $out[] = [
-                'domain'      => $domain,
-                'impressions' => $this->parseInt($row, ['Impressions', 'impressions']),
-                'clicks'      => $this->parseInt($row, ['Clicks', 'clicks']),
-                'ctr'         => $this->parseFloat($row, ['Click Rate', 'clickRate', 'CTR']),
-            ];
-        }
-        return $out;
-    }
+            $app    = $this->extractValue($row, ['App', 'app']);
 
-    private function normalizeApps(array $rows): array
-    {
-        $out = [];
-        foreach ($rows as $row) {
-            $app = $this->extractValue($row, ['App', 'app']);
-            if ($app === '' || $app === '(not set)') continue;
-            $out[] = [
-                'app'         => $app,
-                'impressions' => $this->parseInt($row, ['Impressions', 'impressions']),
-                'clicks'      => $this->parseInt($row, ['Clicks', 'clicks']),
-                'ctr'         => $this->parseFloat($row, ['Click Rate', 'clickRate', 'CTR']),
-            ];
+            $impressions = $this->parseInt($row, ['Impressions', 'impressions']);
+            $clicks      = $this->parseInt($row, ['Clicks', 'clicks']);
+
+            // Determine display name and whether it's an app placement
+            if (
+                $domain === 'adsenseformobileapps.com' ||
+                $domain === 'mobileapp' ||
+                str_starts_with($domain, 'mbapp')
+            ) {
+                // Mobile app placement — use the app name as display name
+                $displayName = ($app !== '' && $app !== '(not set)') ? $app : $domain;
+                $isApp = true;
+            } elseif ($domain !== '' && $domain !== '(not set)') {
+                // Regular web domain
+                $displayName = $domain;
+                $isApp = false;
+            } else {
+                // No usable domain — fall back to app name if present
+                if ($app !== '' && $app !== '(not set)') {
+                    $displayName = $app;
+                    $isApp = true;
+                } else {
+                    continue; // Skip entirely unidentifiable rows
+                }
+            }
+
+            if (!isset($buckets[$displayName])) {
+                $buckets[$displayName] = ['impressions' => 0, 'clicks' => 0, 'is_app' => $isApp];
+            }
+            $buckets[$displayName]['impressions'] += $impressions;
+            $buckets[$displayName]['clicks']      += $clicks;
         }
-        return $out;
+
+        $domains = [];
+        $apps    = [];
+
+        foreach ($buckets as $name => $data) {
+            $totalImpressions = $data['impressions'];
+            $totalClicks      = $data['clicks'];
+            $ctr = $totalImpressions > 0
+                ? round($totalClicks / $totalImpressions * 100, 4)
+                : 0.0;
+
+            $entry = [
+                'impressions' => $totalImpressions,
+                'clicks'      => $totalClicks,
+                'ctr'         => $ctr,
+            ];
+
+            if ($data['is_app']) {
+                $apps[] = array_merge(['app' => $name], $entry);
+            } else {
+                $domains[] = array_merge(['domain' => $name], $entry);
+            }
+        }
+
+        return ['domains' => $domains, 'apps' => $apps];
     }
 
     private function normalizeCreative(array $rows): array

@@ -109,10 +109,10 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
     │       ├── StatCard.tsx             # label + value card
     │       ├── DateRangePicker.tsx      # Preset buttons + custom date inputs
     │       ├── PacingBar.tsx            # Impression pacing progress bar with color coding
-    │       ├── DeviceBreakdownTable.tsx # Device rows with inline bars
-    │       ├── DomainBreakdownTable.tsx # Domain rows, top 10 + show all
-    │       ├── AppBreakdownTable.tsx    # App rows, top 10 + show all; renders empty state if no data
-    │       ├── CreativeBreakdownTable.tsx # Creative rows, top 10 + show all
+    │       ├── DeviceBreakdownChart.tsx # Recharts doughnut chart; colored by device type; custom tooltip; legend with % share
+    │       ├── DomainBreakdownCards.tsx # Top-10 card grid (2-col desktop); impression share bar; "View All" modal with search
+    │       ├── AppBreakdownCards.tsx   # Same as DomainBreakdownCards but purple rank circles; "View All" modal with search
+    │       ├── CreativeBreakdownTable.tsx # Creative rows, top 10; rank col; size badge; impression bar; "View All" modal with search
     │       ├── ConversionCard.tsx       # Renders nothing if available=false
     │       └── VisibilityToggle.tsx     # Eye/eye-off icon button; only renders when impersonation_token in localStorage
     ├── components/
@@ -337,6 +337,9 @@ php artisan db:seed --class=AdminSeeder --force
 ### Frontend
 ```bash
 cd /var/www/muslimadnetwork-reporting/frontend
+
+# Dependencies (recharts installed for device doughnut chart)
+# npm install recharts
 
 # Build
 npm run build
