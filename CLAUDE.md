@@ -42,11 +42,13 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 │   │   │   │       ├── ImpersonationController.php
 │   │   │   │       ├── StatsController.php        # total_clients, total_users, total_campaigns, campaigns_by_status, top_clients, recent_activity
 │   │   │   │       ├── AuditLogController.php    # GET /api/admin/audit-log; paginated 50/page; filters: admin_id, action, date_from, date_to
+│   │   │   │       ├── OfferAdminController.php  # CRUD + toggle for offers; index includes dismissals_count + client name
 │   │   │   │       ├── CacheController.php       # Manual cache invalidation
 │   │   │   │       ├── OnboardingController.php  # Send onboarding email (resets password + emails credentials)
 │   │   │   │       └── VisibilityController.php  # Admin visibility CRUD (overview/show/upsert/reset)
 │   │   │   └── Client/
-│   │   │       └── VisibilityController.php      # Client reads own visibility settings
+│   │   │       ├── VisibilityController.php      # Client reads own visibility settings
+│   │   │       └── OfferController.php           # GET /api/client/offers (active, non-dismissed); POST /api/client/offers/{id}/dismiss
 │   │   │   └── Middleware/
 │   │   │       └── RoleMiddleware.php
 │   │   ├── Services/
@@ -59,7 +61,9 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 │   │       ├── Campaign.php
 │   │       ├── ReportCache.php
 │   │       ├── ClientVisibilitySetting.php
-│   │       └── AdminAuditLog.php
+│   │       ├── AdminAuditLog.php
+│   │       ├── Offer.php                    # title, body, cta_label, cta_url, target, client_id, is_active, starts_at, ends_at
+│   │       └── OfferDismissal.php           # user_id, offer_id, dismissed_at; unique(user_id, offer_id)
 │   ├── config/
 │   │   ├── cors.php
 │   │   ├── sanctum.php
@@ -92,12 +96,14 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
     │       ├── users/page.tsx           # User CRUD + password generation
     │       ├── campaigns/page.tsx       # Campaign CRUD + client filter
     │       ├── visibility/page.tsx      # Visibility management — overview cards + per-client accordion panel
-    │       └── audit-log/page.tsx       # Full audit log: filters (date/action/admin), paginated table (50/page), expandable metadata, CSV export
+    │       ├── audit-log/page.tsx       # Full audit log: filters (date/action/admin), paginated table (50/page), expandable metadata, CSV export
+    │       └── offers/page.tsx          # Offers CRUD table; toggle active; create/edit modal with live banner preview
     ├── context/
     │   └── AuthContext.tsx              # + isImpersonating, stopImpersonation()
     ├── hooks/
-    │   ├── useReport.ts                 # Generic report data hook (type, dateFrom, dateTo, campaignId)
-    │   └── useVisibility.ts             # Fetches /api/client/visibility; isHidden(section, rowKey?), toggle()
+    │   ├── useReport.ts                 # Generic report data hook (type, dateFrom, dateTo, campaignId); clears data on dep change
+    │   ├── useVisibility.ts             # Fetches /api/client/visibility; isHidden(section, rowKey?), toggle()
+    │   └── useOffers.ts                 # Fetches /api/client/offers; dismissOffer(id) optimistic update
     ├── types/
     │   └── reports.ts                   # TS interfaces: SummaryReport, DeviceRow, DomainRow, AppRow, SiteBreakdown, CreativeRow, ConversionReport, Campaign, Client
     ├── lib/
@@ -116,7 +122,9 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
     │       ├── AppBreakdownCards.tsx   # Same as DomainBreakdownCards but purple rank circles; "View All" modal with search
     │       ├── CreativeBreakdownTable.tsx # Creative rows, top 10; rank col; size badge; impression bar; "View All" modal with search
     │       ├── ConversionCard.tsx       # Renders nothing if available=false
-    │       └── VisibilityToggle.tsx     # Eye/eye-off icon button; only renders when impersonation_token in localStorage
+    │       ├── VisibilityToggle.tsx     # Eye/eye-off icon button; only renders when impersonation_token in localStorage
+    │       ├── OfferBanner.tsx          # Single offer banner; gradient green bg; fade-out on dismiss
+    │       └── OffersStack.tsx          # Renders first banner + "+N more" expand pill; uses OfferBanner
     ├── components/
     │   └── ui/
     │       └── Toast.tsx               # Toast component + useToast() hook (showToast, ToastContainer); auto-dismisses 2s
@@ -224,6 +232,11 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 | POST | `/api/admin/cache/invalidate/{campaign_id}` | Invalidate all cached reports for campaign |
 | GET | `/api/admin/cm360-test` | Test CM360 service auth |
 | GET | `/api/admin/audit-log` | Paginated audit log; filters: admin_id, action, date_from, date_to |
+| GET | `/api/admin/offers` | All offers with client name and dismissals_count |
+| POST | `/api/admin/offers` | Create offer |
+| PUT | `/api/admin/offers/{id}` | Update offer |
+| DELETE | `/api/admin/offers/{id}` | Delete offer |
+| POST | `/api/admin/offers/{id}/toggle` | Toggle is_active |
 | GET | `/api/admin/visibility/overview` | Summary of all clients' hidden sections/rows |
 | GET | `/api/admin/visibility/{client_id}` | Get grouped visibility settings for a client |
 | POST | `/api/admin/visibility/{client_id}` | Upsert a visibility setting `{ section, level, row_key, is_hidden }` |
@@ -240,6 +253,8 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 | GET | `/api/reports/creative` | Creative breakdown |
 | GET | `/api/reports/conversion` | Conversion report (requires has_conversion_tracking) |
 | GET | `/api/client/visibility` | Returns grouped visibility settings for the authenticated client |
+| GET | `/api/client/offers` | Returns active non-dismissed offers for user's client |
+| POST | `/api/client/offers/{id}/dismiss` | Record offer dismissal for authenticated user |
 
 > Report endpoints accept query params: `date_from` (Y-m-d), `date_to` (Y-m-d), and optionally `campaign_id` (required for multi_campaign clients).
 

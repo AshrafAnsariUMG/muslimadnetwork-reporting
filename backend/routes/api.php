@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Api\Admin\AuditLogController;
+use App\Http\Controllers\Api\Admin\OfferAdminController;
+use App\Http\Controllers\Api\Client\OfferController;
 use App\Http\Controllers\Api\Admin\CacheController;
 use App\Http\Controllers\Api\Admin\CampaignController;
 use App\Http\Controllers\Api\Admin\ClientController;
@@ -41,6 +43,13 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
 
     // Audit log
     Route::get('/admin/audit-log', [AuditLogController::class, 'index']);
+
+    // Offers management
+    Route::get('/admin/offers', [OfferAdminController::class, 'index']);
+    Route::post('/admin/offers', [OfferAdminController::class, 'store']);
+    Route::put('/admin/offers/{id}', [OfferAdminController::class, 'update']);
+    Route::delete('/admin/offers/{id}', [OfferAdminController::class, 'destroy']);
+    Route::post('/admin/offers/{id}/toggle', [OfferAdminController::class, 'toggle']);
 
     // Clients
     Route::get('/admin/clients', [ClientController::class, 'index']);
@@ -95,6 +104,10 @@ Route::middleware(['auth:sanctum', 'role:client'])->group(function () {
 
     // Visibility settings (client reads their own)
     Route::get('/client/visibility', [ClientVisibilityController::class, 'index']);
+
+    // Offers
+    Route::get('/client/offers', [OfferController::class, 'index']);
+    Route::post('/client/offers/{id}/dismiss', [OfferController::class, 'dismiss']);
 
     // Reports
     Route::get('/reports/campaigns', [ReportController::class, 'campaigns']);
