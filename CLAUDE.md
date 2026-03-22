@@ -34,6 +34,7 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 │   │   │   │   ├── AuthController.php
 │   │   │   │   ├── UmmahPassController.php
 │   │   │   │   ├── ReportController.php          # Client report endpoints
+│   │   │   │   ├── PasswordResetController.php   # forgot-password + reset-password
 │   │   │   │   └── Admin/
 │   │   │   │       ├── ClientController.php
 │   │   │   │       ├── UserController.php
@@ -41,6 +42,7 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 │   │   │   │       ├── ImpersonationController.php
 │   │   │   │       ├── StatsController.php
 │   │   │   │       ├── CacheController.php       # Manual cache invalidation
+│   │   │   │       ├── OnboardingController.php  # Send onboarding email (resets password + emails credentials)
 │   │   │   │       └── VisibilityController.php  # Admin visibility CRUD (overview/show/upsert/reset)
 │   │   │   └── Client/
 │   │   │       └── VisibilityController.php      # Client reads own visibility settings
@@ -48,6 +50,7 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 │   │   │       └── RoleMiddleware.php
 │   │   ├── Services/
 │   │   │   ├── CM360Service.php              # Google CM360 API integration
+│   │   │   ├── GmailMailerService.php        # Gmail API mailer (OAuth2 refresh token, bypasses Laravel mail)
 │   │   │   └── ReportCacheService.php        # TTL caching layer over CM360Service
 │   │   └── Models/
 │   │       ├── User.php
@@ -66,12 +69,18 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 │   │       └── AdminSeeder.php          # admin@muslimadnetwork.com / Admin@1234
 │   ├── routes/
 │   │   └── api.php
+│   ├── resources/views/emails/
+│   │   ├── layout.blade.php            # Base email template (green header, footer)
+│   │   ├── onboarding.blade.php        # Welcome + credentials email
+│   │   └── reset_password.blade.php    # Password reset link email
 │   └── .env
 └── frontend/
     ├── app/
     │   ├── layout.tsx                   # AuthProvider + Inter font
     │   ├── page.tsx                     # → /login
-    │   ├── login/page.tsx
+    │   ├── login/page.tsx               # Includes "Forgot your password?" link
+    │   ├── forgot-password/page.tsx     # Email input → POST /api/auth/forgot-password
+    │   ├── reset-password/page.tsx      # Token+email from URL → POST /api/auth/reset-password
     │   ├── dashboard/
     │   │   ├── layout.tsx               # Max-width container, white bg, no sidebar
     │   │   └── page.tsx                 # Full reporting dashboard — summary, pacing, device/site/creative breakdowns
@@ -146,6 +155,10 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 | `UMMAHPASS_CLIENT_ID` | (to be filled) |
 | `UMMAHPASS_CLIENT_SECRET` | (to be filled) |
 | `UMMAHPASS_REDIRECT_URI` | http://37.27.215.90:8001/api/auth/ummahpass/callback |
+| `GMAIL_OAUTH_CLIENT_ID` | Gmail OAuth client ID |
+| `GMAIL_OAUTH_CLIENT_SECRET` | Gmail OAuth client secret |
+| `GMAIL_REFRESH_TOKEN` | Long-lived Gmail refresh token (obtained via one-time OAuth flow) |
+| `GMAIL_FROM_ADDRESS` | support@muslimadnetwork.com |
 
 ### Frontend (`frontend/.env`)
 
@@ -166,6 +179,7 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 | `client_visibility_settings` | Per-client show/hide settings for sections and table rows |
 | `offers` | Promotional offers shown in portal (global or per-client) |
 | `offer_dismissals` | Tracks which users dismissed which offers |
+| `reporting_password_resets` | Password reset tokens — email, sha256-hashed token, created_at. TTL 60 min, single-use. |
 | `admin_audit_log` | Audit trail for admin actions, including impersonation |
 | `personal_access_tokens` | Sanctum API tokens |
 | `sessions` | Redis-backed sessions (table exists as fallback schema) |
@@ -182,6 +196,8 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 | POST | `/api/auth/login` | Email + password login |
 | GET | `/api/auth/ummahpass/redirect` | Redirect to UmmahPass OAuth |
 | GET | `/api/auth/ummahpass/callback` | OAuth callback handler |
+| POST | `/api/auth/forgot-password` | Send password reset email (rate limited 3/min) |
+| POST | `/api/auth/reset-password` | Consume token, set new password |
 
 ### Sanctum (any authenticated user)
 | Method | Path | Description |
@@ -199,6 +215,7 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 | GET/POST | `/api/admin/users` | List / create users |
 | PUT/DELETE | `/api/admin/users/{id}` | Update / delete user |
 | POST | `/api/admin/users/{id}/reset-password` | Reset user password |
+| POST | `/api/admin/users/{id}/send-onboarding` | Reset password + email credentials to client user |
 | GET/POST | `/api/admin/campaigns` | List / create campaigns |
 | PUT/DELETE | `/api/admin/campaigns/{id}` | Update / delete campaign |
 | POST | `/api/admin/impersonate/{client_id}` | Start client impersonation |

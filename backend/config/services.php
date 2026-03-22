@@ -54,7 +54,6 @@ return [
     'gmail' => [
         'client_id' => env('GMAIL_OAUTH_CLIENT_ID'),
         'client_secret' => env('GMAIL_OAUTH_CLIENT_SECRET'),
-        'redirect_uri' => env('GMAIL_REDIRECT_URI'),
         'refresh_token' => env('GMAIL_REFRESH_TOKEN'),
         'from_address' => env('GMAIL_FROM_ADDRESS'),
     ],

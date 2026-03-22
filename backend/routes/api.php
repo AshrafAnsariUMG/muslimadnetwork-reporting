@@ -4,12 +4,13 @@ use App\Http\Controllers\Api\Admin\CacheController;
 use App\Http\Controllers\Api\Admin\CampaignController;
 use App\Http\Controllers\Api\Admin\ClientController;
 use App\Http\Controllers\Api\Admin\ImpersonationController;
+use App\Http\Controllers\Api\Admin\OnboardingController;
 use App\Http\Controllers\Api\Admin\StatsController;
 use App\Http\Controllers\Api\Admin\UserController;
 use App\Http\Controllers\Api\Admin\VisibilityController as AdminVisibilityController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\Client\VisibilityController as ClientVisibilityController;
-use App\Http\Controllers\Api\GmailAuthController;
+use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\UmmahPassController;
 use Illuminate\Support\Facades\Route;
@@ -18,10 +19,8 @@ use Illuminate\Support\Facades\Route;
 Route::post('/auth/login', [AuthController::class, 'login']);
 Route::get('/auth/ummahpass/redirect', [UmmahPassController::class, 'redirect']);
 Route::get('/auth/ummahpass/callback', [UmmahPassController::class, 'callback']);
-
-// Temporary Gmail OAuth flow — remove after refresh token is obtained
-Route::get('/auth/gmail/connect', [GmailAuthController::class, 'connect']);
-Route::get('/auth/gmail/callback', [GmailAuthController::class, 'callback']);
+Route::post('/auth/forgot-password', [PasswordResetController::class, 'forgotPassword'])->middleware('throttle:3,1');
+Route::post('/auth/reset-password', [PasswordResetController::class, 'resetPassword']);
 
 // Protected routes (sanctum, no role restriction)
 // NOTE: /admin/impersonate/stop must be registered before /admin/impersonate/{client_id}
@@ -52,6 +51,7 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::put('/admin/users/{id}', [UserController::class, 'update']);
     Route::delete('/admin/users/{id}', [UserController::class, 'destroy']);
     Route::post('/admin/users/{id}/reset-password', [UserController::class, 'resetPassword']);
+    Route::post('/admin/users/{id}/send-onboarding', [OnboardingController::class, 'send']);
 
     // Campaigns
     Route::get('/admin/campaigns', [CampaignController::class, 'index']);
