@@ -56,26 +56,51 @@ class CM360Service
 
     public function fetchSummaryReport(Campaign $campaign, string $dateFrom, string $dateTo): array
     {
+        $rows = $this->runReport($this->buildSummaryReport($campaign, $dateFrom, $dateTo));
+        return $this->normalizeSummary($rows, $dateFrom, $dateTo);
+    }
+
+    public function fetchDeviceBreakdown(Campaign $campaign, string $dateFrom, string $dateTo): array
+    {
+        $rows = $this->runReport($this->buildDeviceReport($campaign, $dateFrom, $dateTo));
+        return $this->normalizeDevice($rows);
+    }
+
+    public function fetchSiteBreakdown(Campaign $campaign, string $dateFrom, string $dateTo): array
+    {
+        $domainRows = $this->runReport($this->buildDomainReport($campaign, $dateFrom, $dateTo));
+        $appRows    = $this->runReport($this->buildAppReport($campaign, $dateFrom, $dateTo));
+
+        return [
+            'domains' => $this->normalizeDomains($domainRows),
+            'apps'    => $this->normalizeApps($appRows),
+        ];
+    }
+
+    public function fetchCreativeBreakdown(Campaign $campaign, string $dateFrom, string $dateTo): array
+    {
+        $rows = $this->runReport($this->buildCreativeReport($campaign, $dateFrom, $dateTo));
+        return $this->normalizeCreative($rows);
+    }
+
+    public function fetchConversionReport(Campaign $campaign, string $dateFrom, string $dateTo): array
+    {
+        $rows = $this->runReport($this->buildConversionReport($campaign, $dateFrom, $dateTo));
+        return $this->normalizeConversion($rows);
+    }
+
+    private function buildSummaryReport(Campaign $campaign, string $dateFrom, string $dateTo): Report
+    {
         $report = $this->buildStandardReport('MAN-Summary', $dateFrom, $dateTo);
         $criteria = $report->getCriteria();
         $criteria->setDimensions([$this->makeDimension('campaign')]);
         $criteria->setMetricNames(['impressions', 'clicks', 'clickRate']);
         $this->addCampaignFilter($criteria, $campaign->cm360_campaign_id);
         $report->setCriteria($criteria);
-
-        $rows = $this->runReport($report);
-        $row = $rows[0] ?? [];
-
-        return [
-            'impressions' => $this->parseInt($row, ['Impressions', 'impressions']),
-            'clicks'      => $this->parseInt($row, ['Clicks', 'clicks']),
-            'ctr'         => $this->parseFloat($row, ['Click Rate', 'clickRate', 'CTR']),
-            'date_from'   => $dateFrom,
-            'date_to'     => $dateTo,
-        ];
+        return $report;
     }
 
-    public function fetchDeviceBreakdown(Campaign $campaign, string $dateFrom, string $dateTo): array
+    private function buildDeviceReport(Campaign $campaign, string $dateFrom, string $dateTo): Report
     {
         $report = $this->buildStandardReport('MAN-Device', $dateFrom, $dateTo);
         $criteria = $report->getCriteria();
@@ -83,37 +108,32 @@ class CM360Service
         $criteria->setMetricNames(['impressions', 'clicks', 'clickRate']);
         $this->addCampaignFilter($criteria, $campaign->cm360_campaign_id);
         $report->setCriteria($criteria);
-
-        $rows = $this->runReport($report);
-
-        return array_map(fn ($row) => [
-            'device'      => $this->extractValue($row, ['Platform Type', 'platformType']),
-            'impressions' => $this->parseInt($row, ['Impressions', 'impressions']),
-            'clicks'      => $this->parseInt($row, ['Clicks', 'clicks']),
-            'ctr'         => $this->parseFloat($row, ['Click Rate', 'clickRate', 'CTR']),
-        ], $rows);
+        return $report;
     }
 
-    public function fetchSiteBreakdown(Campaign $campaign, string $dateFrom, string $dateTo): array
+    private function buildDomainReport(Campaign $campaign, string $dateFrom, string $dateTo): Report
     {
-        $report = $this->buildStandardReport('MAN-Site', $dateFrom, $dateTo);
+        $report = $this->buildStandardReport('MAN-Domain', $dateFrom, $dateTo);
         $criteria = $report->getCriteria();
-        $criteria->setDimensions([$this->makeDimension('site')]);
+        $criteria->setDimensions([$this->makeDimension('domain')]);
         $criteria->setMetricNames(['impressions', 'clicks', 'clickRate']);
         $this->addCampaignFilter($criteria, $campaign->cm360_campaign_id);
         $report->setCriteria($criteria);
-
-        $rows = $this->runReport($report);
-
-        return array_map(fn ($row) => [
-            'site'        => $this->extractValue($row, ['Site (CM360)', 'Site', 'site']),
-            'impressions' => $this->parseInt($row, ['Impressions', 'impressions']),
-            'clicks'      => $this->parseInt($row, ['Clicks', 'clicks']),
-            'ctr'         => $this->parseFloat($row, ['Click Rate', 'clickRate', 'CTR']),
-        ], $rows);
+        return $report;
     }
 
-    public function fetchCreativeBreakdown(Campaign $campaign, string $dateFrom, string $dateTo): array
+    private function buildAppReport(Campaign $campaign, string $dateFrom, string $dateTo): Report
+    {
+        $report = $this->buildStandardReport('MAN-App', $dateFrom, $dateTo);
+        $criteria = $report->getCriteria();
+        $criteria->setDimensions([$this->makeDimension('app')]);
+        $criteria->setMetricNames(['impressions', 'clicks', 'clickRate']);
+        $this->addCampaignFilter($criteria, $campaign->cm360_campaign_id);
+        $report->setCriteria($criteria);
+        return $report;
+    }
+
+    private function buildCreativeReport(Campaign $campaign, string $dateFrom, string $dateTo): Report
     {
         $report = $this->buildStandardReport('MAN-Creative', $dateFrom, $dateTo);
         $criteria = $report->getCriteria();
@@ -124,42 +144,92 @@ class CM360Service
         $criteria->setMetricNames(['impressions', 'clicks', 'clickRate']);
         $this->addCampaignFilter($criteria, $campaign->cm360_campaign_id);
         $report->setCriteria($criteria);
+        return $report;
+    }
 
-        $rows = $this->runReport($report);
+    private function buildConversionReport(Campaign $campaign, string $dateFrom, string $dateTo): Report
+    {
+        $report = $this->buildStandardReport('MAN-Conversions', $dateFrom, $dateTo);
+        $criteria = $report->getCriteria();
+        $criteria->setDimensions([$this->makeDimension('campaign')]);
+        $criteria->setMetricNames(['totalConversions', 'totalConversionValue']);
+        $campaignFilter = new DimensionValue();
+        $campaignFilter->setDimensionName('campaign');
+        $campaignFilter->setId($campaign->cm360_campaign_id);
+        $campaignFilter->setMatchType('EXACT');
+        $criteria->setDimensionFilters([$campaignFilter]);
+        $report->setCriteria($criteria);
+        return $report;
+    }
 
+    private function normalizeSummary(array $rows, string $dateFrom, string $dateTo): array
+    {
+        $row = $rows[0] ?? [];
+        return [
+            'impressions' => $this->parseInt($row, ['Impressions', 'impressions']),
+            'clicks'      => $this->parseInt($row, ['Clicks', 'clicks']),
+            'ctr'         => $this->parseFloat($row, ['Click Rate', 'clickRate', 'CTR']),
+            'date_from'   => $dateFrom,
+            'date_to'     => $dateTo,
+        ];
+    }
+
+    private function normalizeDevice(array $rows): array
+    {
+        return array_map(fn ($row) => [
+            'device'      => $this->extractValue($row, ['Platform Type', 'platformType']),
+            'impressions' => $this->parseInt($row, ['Impressions', 'impressions']),
+            'clicks'      => $this->parseInt($row, ['Clicks', 'clicks']),
+            'ctr'         => $this->parseFloat($row, ['Click Rate', 'clickRate', 'CTR']),
+        ], $rows);
+    }
+
+    private function normalizeDomains(array $rows): array
+    {
+        $out = [];
+        foreach ($rows as $row) {
+            $domain = $this->extractValue($row, ['Domain', 'domain']);
+            if ($domain === '' || $domain === '(not set)') continue;
+            $out[] = [
+                'domain'      => $domain,
+                'impressions' => $this->parseInt($row, ['Impressions', 'impressions']),
+                'clicks'      => $this->parseInt($row, ['Clicks', 'clicks']),
+                'ctr'         => $this->parseFloat($row, ['Click Rate', 'clickRate', 'CTR']),
+            ];
+        }
+        return $out;
+    }
+
+    private function normalizeApps(array $rows): array
+    {
+        $out = [];
+        foreach ($rows as $row) {
+            $app = $this->extractValue($row, ['App', 'app']);
+            if ($app === '' || $app === '(not set)') continue;
+            $out[] = [
+                'app'         => $app,
+                'impressions' => $this->parseInt($row, ['Impressions', 'impressions']),
+                'clicks'      => $this->parseInt($row, ['Clicks', 'clicks']),
+                'ctr'         => $this->parseFloat($row, ['Click Rate', 'clickRate', 'CTR']),
+            ];
+        }
+        return $out;
+    }
+
+    private function normalizeCreative(array $rows): array
+    {
         return array_map(fn ($row) => [
             'creative_name' => $this->extractValue($row, ['Creative', 'creative']),
-            'size'          => $this->extractValue($row, ['Creative Size', 'creativeSize']),
+            'size'          => $this->extractValue($row, ['Creative Pixel Size', 'Creative Size', 'creativeSize']),
             'impressions'   => $this->parseInt($row, ['Impressions', 'impressions']),
             'clicks'        => $this->parseInt($row, ['Clicks', 'clicks']),
             'ctr'           => $this->parseFloat($row, ['Click Rate', 'clickRate', 'CTR']),
         ], $rows);
     }
 
-    public function fetchConversionReport(Campaign $campaign, string $dateFrom, string $dateTo): array
+    private function normalizeConversion(array $rows): array
     {
-        // Use a STANDARD report with conversion metrics + activity filter
-        $report = $this->buildStandardReport('MAN-Conversions', $dateFrom, $dateTo);
-        $criteria = $report->getCriteria();
-        $criteria->setMetricNames(['totalConversions', 'totalConversionValue']);
-
-        // Filter by campaign and activity
-        $campaignFilter = new DimensionValue();
-        $campaignFilter->setDimensionName('campaign');
-        $campaignFilter->setId($campaign->cm360_campaign_id);
-        $campaignFilter->setMatchType('EXACT');
-
-        $activityFilter = new DimensionValue();
-        $activityFilter->setDimensionName('activity');
-        $activityFilter->setId($campaign->cm360_activity_id);
-        $activityFilter->setMatchType('EXACT');
-
-        $criteria->setDimensionFilters([$campaignFilter, $activityFilter]);
-        $report->setCriteria($criteria);
-
-        $rows = $this->runReport($report);
         $row = $rows[0] ?? [];
-
         return [
             'total_conversions'      => $this->parseInt($row, ['Total Conversions', 'totalConversions', 'Conversions']),
             'total_conversion_value' => $this->parseFloat($row, ['Total Conversion Value', 'totalConversionValue']),
@@ -210,16 +280,13 @@ class CM360Service
      */
     private function runReport(Report $report): array
     {
-        // Insert (creates a stored report)
         $inserted = $this->service->reports->insert($this->profileId, $report);
         $reportId = $inserted->getId();
 
         try {
-            // Start the run
-            $file = $this->service->reports->run($this->profileId, $reportId);
+            $file   = $this->service->reports->run($this->profileId, $reportId);
             $fileId = $file->getId();
 
-            // Poll until REPORT_AVAILABLE or FAILED
             $maxAttempts = 60;
             for ($i = 0; $i < $maxAttempts; $i++) {
                 $status = $file->getStatus();
@@ -240,12 +307,8 @@ class CM360Service
                 throw new \RuntimeException('CM360 report timed out after 120 seconds.');
             }
 
-            // Download the CSV
-            $csvContent = $this->downloadReportFile($reportId, $fileId);
-
-            return $this->parseCsv($csvContent);
+            return $this->parseCsv($this->downloadReportFile($reportId, $fileId));
         } finally {
-            // Cleanup: delete the report to avoid cluttering CM360
             try {
                 $this->service->reports->delete($this->profileId, $reportId);
             } catch (\Throwable $e) {
@@ -284,6 +347,17 @@ class CM360Service
      * CM360 CSVs have metadata lines at the top, then a header row,
      * then data rows, then a "Grand Total:" footer.
      */
+    /**
+     * Parse CM360 report CSV format.
+     *
+     * CM360 CSV structure:
+     *   Line 1:  Report name (no prefix)
+     *   Lines 2+: Metadata (Date/Time, Account ID, Date Range, etc.)
+     *   Line:    "Report Fields"  ← marker (no colon)
+     *   Line:    Actual column headers (Campaign,Impressions,Clicks,Click Rate…)
+     *   Lines:   Data rows
+     *   Line:    "Grand Total:,…"  ← stop here
+     */
     private function parseCsv(string $content): array
     {
         if (empty(trim($content))) {
@@ -293,39 +367,33 @@ class CM360Service
         $lines = explode("\n", str_replace("\r\n", "\n", $content));
         $lines = array_map('trim', $lines);
 
-        // Find the header row: the first line that looks like actual column headers
-        // (not metadata). We detect it by checking if it does NOT contain a colon
-        // pattern like "Report Name: ..." and has multiple comma-separated values.
-        $headerIdx = null;
-        $headers = [];
+        // Seek the "Report Fields" marker, then take the next non-empty line as headers.
+        $headerIdx   = null;
+        $headers     = [];
+        $foundMarker = false;
 
         foreach ($lines as $idx => $line) {
             if (empty($line)) continue;
 
-            // Skip metadata lines (typically "Label: Value" format or short single items)
-            // The data header row will have multiple fields separated by commas
-            $cells = str_getcsv($line);
-
-            // Skip if this is clearly a metadata line (contains colon in first cell and only 1-2 cells)
-            if (count($cells) <= 2 && str_contains($cells[0] ?? '', ':')) {
+            if (!$foundMarker) {
+                // Match "Report Fields" with or without trailing colon, possibly quoted
+                $bare = trim($line, '"');
+                if ($bare === 'Report Fields' || $bare === 'Report Fields:') {
+                    $foundMarker = true;
+                }
                 continue;
             }
 
-            // Skip the "Report Fields:" marker line
-            if (trim($cells[0] ?? '') === 'Report Fields:' || str_starts_with(trim($line), 'Report Fields:')) {
-                continue;
-            }
-
-            // This looks like a header/data row — use it as our header
-            if (count($cells) >= 1 && !empty($cells[0])) {
-                $headerIdx = $idx;
-                $headers = array_map('trim', $cells);
-                break;
-            }
+            // First non-empty line after the marker is the column header row
+            $headers   = array_map('trim', str_getcsv($line));
+            $headerIdx = $idx;
+            break;
         }
 
         if ($headerIdx === null || empty($headers)) {
-            Log::warning('CM360 CSV: could not locate header row', ['preview' => substr($content, 0, 500)]);
+            Log::warning('CM360 CSV: could not locate header row after "Report Fields" marker', [
+                'preview' => substr($content, 0, 800),
+            ]);
             return [];
         }
 
@@ -334,7 +402,6 @@ class CM360Service
             $line = trim($lines[$i]);
             if (empty($line)) continue;
 
-            // Stop at the Grand Total footer
             if (
                 str_starts_with($line, 'Grand Total:') ||
                 str_starts_with($line, 'Totals:') ||

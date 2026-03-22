@@ -40,7 +40,10 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 │   │   │   │       ├── CampaignController.php
 │   │   │   │       ├── ImpersonationController.php
 │   │   │   │       ├── StatsController.php
-│   │   │   │       └── CacheController.php       # Manual cache invalidation
+│   │   │   │       ├── CacheController.php       # Manual cache invalidation
+│   │   │   │       └── VisibilityController.php  # Admin visibility CRUD (overview/show/upsert/reset)
+│   │   │   └── Client/
+│   │   │       └── VisibilityController.php      # Client reads own visibility settings
 │   │   │   └── Middleware/
 │   │   │       └── RoleMiddleware.php
 │   │   ├── Services/
@@ -51,6 +54,7 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 │   │       ├── Client.php
 │   │       ├── Campaign.php
 │   │       ├── ReportCache.php
+│   │       ├── ClientVisibilitySetting.php
 │   │       └── AdminAuditLog.php
 │   ├── config/
 │   │   ├── cors.php
@@ -77,13 +81,15 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
     │       ├── clients/page.tsx         # Client CRUD + impersonate
     │       ├── users/page.tsx           # User CRUD + password generation
     │       ├── campaigns/page.tsx       # Campaign CRUD + client filter
+    │       ├── visibility/page.tsx      # Visibility management — overview cards + per-client accordion panel
     │       └── audit-log/page.tsx       # Placeholder
     ├── context/
     │   └── AuthContext.tsx              # + isImpersonating, stopImpersonation()
     ├── hooks/
-    │   └── useReport.ts                 # Generic report data hook (type, dateFrom, dateTo, campaignId)
+    │   ├── useReport.ts                 # Generic report data hook (type, dateFrom, dateTo, campaignId)
+    │   └── useVisibility.ts             # Fetches /api/client/visibility; isHidden(section, rowKey?), toggle()
     ├── types/
-    │   └── reports.ts                   # TS interfaces: SummaryReport, DeviceRow, SiteRow, CreativeRow, ConversionReport, Campaign, Client
+    │   └── reports.ts                   # TS interfaces: SummaryReport, DeviceRow, DomainRow, AppRow, SiteBreakdown, CreativeRow, ConversionReport, Campaign, Client
     ├── lib/
     │   ├── api.ts
     │   └── dateUtils.ts                 # getDefaultDateRange, formatDate, formatNumber, formatCTR, getPacingPercentage
@@ -95,9 +101,14 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
     │       ├── DateRangePicker.tsx      # Preset buttons + custom date inputs
     │       ├── PacingBar.tsx            # Impression pacing progress bar with color coding
     │       ├── DeviceBreakdownTable.tsx # Device rows with inline bars
-    │       ├── SiteBreakdownTable.tsx   # Site rows, top 10 + show all
+    │       ├── DomainBreakdownTable.tsx # Domain rows, top 10 + show all
+    │       ├── AppBreakdownTable.tsx    # App rows, top 10 + show all; renders empty state if no data
     │       ├── CreativeBreakdownTable.tsx # Creative rows, top 10 + show all
-    │       └── ConversionCard.tsx       # Renders nothing if available=false
+    │       ├── ConversionCard.tsx       # Renders nothing if available=false
+    │       └── VisibilityToggle.tsx     # Eye/eye-off icon button; only renders when impersonation_token in localStorage
+    ├── components/
+    │   └── ui/
+    │       └── Toast.tsx               # Toast component + useToast() hook (showToast, ToastContainer); auto-dismisses 2s
     └── .env
 ```
 
@@ -152,6 +163,7 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 | `clients` | Advertiser clients — no longer stores CM360 IDs (those are global in .env) |
 | `campaigns` | CM360 campaigns linked to clients; optionally have `cm360_activity_id` for conversion tracking |
 | `report_cache` | Cached CM360 report payloads with expiry |
+| `client_visibility_settings` | Per-client show/hide settings for sections and table rows |
 | `offers` | Promotional offers shown in portal (global or per-client) |
 | `offer_dismissals` | Tracks which users dismissed which offers |
 | `admin_audit_log` | Audit trail for admin actions, including impersonation |
@@ -192,6 +204,10 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 | POST | `/api/admin/impersonate/{client_id}` | Start client impersonation |
 | POST | `/api/admin/cache/invalidate/{campaign_id}` | Invalidate all cached reports for campaign |
 | GET | `/api/admin/cm360-test` | Test CM360 service auth |
+| GET | `/api/admin/visibility/overview` | Summary of all clients' hidden sections/rows |
+| GET | `/api/admin/visibility/{client_id}` | Get grouped visibility settings for a client |
+| POST | `/api/admin/visibility/{client_id}` | Upsert a visibility setting `{ section, level, row_key, is_hidden }` |
+| DELETE | `/api/admin/visibility/{client_id}/reset` | Reset all visibility settings for client to defaults |
 
 ### Client only (sanctum + role:client)
 | Method | Path | Description |
@@ -203,6 +219,7 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 | GET | `/api/reports/site` | Site breakdown |
 | GET | `/api/reports/creative` | Creative breakdown |
 | GET | `/api/reports/conversion` | Conversion report (requires has_conversion_tracking) |
+| GET | `/api/client/visibility` | Returns grouped visibility settings for the authenticated client |
 
 > Report endpoints accept query params: `date_from` (Y-m-d), `date_to` (Y-m-d), and optionally `campaign_id` (required for multi_campaign clients).
 
@@ -216,9 +233,28 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 - Conversion tracking is per-campaign: `has_conversion_tracking` (bool) + `cm360_activity_id` (nullable string)
 - CM360 OAuth credentials: `CM360_OAUTH_CLIENT_ID` + `CM360_OAUTH_CLIENT_SECRET` (set in .env)
 
+## Visibility Control System
+
+Admins can hide/show entire sections or individual table rows per client while impersonating.
+
+- **DB**: `client_visibility_settings` — keyed by `(client_id, section, level, row_key)`. `level` = `section` | `row`. `row_key` = NULL for section-level.
+- **Sections**: `summary`, `pacing`, `device`, `domain`, `app`, `creative`, `conversion`
+- **Admin writes**: `POST /api/admin/visibility/{client_id}` using the `admin_token` (not the impersonation token). VisibilityToggle reads `admin_token` from localStorage.
+- **Client reads**: `GET /api/client/visibility` using the current `auth_token`. Response shape: `{ device: { section_hidden: bool, hidden_rows: string[] }, ... }`
+- **`useVisibility(clientId)`**: fetches client visibility on mount; exposes `isHidden(section, rowKey?)` and `toggle(section, level, rowKey, hidden)`. Toggle does optimistic update + API call.
+- **`VisibilityToggle`**: only renders when `impersonation_token` in localStorage. Eye/eye-off icon. Red tint when hidden.
+- **Client view**: hidden items are not rendered at all (no indication).
+- **Admin impersonation view**: hidden items show at 0.3–0.4 opacity with eye-off icon so admin can restore.
+
+---
+
 ## CM360 Service Architecture
 
 - **`CM360Service`** — Singleton. Initializes `Google\Client` on construction via `fetchAccessTokenWithRefreshToken()`. Each public method builds a `Google\Service\Dfareporting\Report`, calls `runReport()` which does insert→run→poll(60×2s)→download CSV→parse. Cleans up the CM360 report in `finally`. Methods: `fetchSummaryReport`, `fetchDeviceBreakdown`, `fetchSiteBreakdown`, `fetchCreativeBreakdown`, `fetchConversionReport`.
+  - Report building and normalization are private helpers (`buildXxxReport`, `normalizeXxx`) shared by the public methods.
+  - **CSV parsing**: CM360 CSVs start with the report name (no prefix), then metadata, then a `Report Fields` marker line (no colon), then actual column headers, then data rows, then `Grand Total:`. The parser seeks the `Report Fields` marker and uses the next line as headers.
+  - **Confirmed CM360 column names**: `Campaign`, `Impressions`, `Clicks`, `Click Rate` (metrics); `Platform Type` (device); `Site (CM360)` (site); `Creative`, `Creative Pixel Size` (creative — note: NOT "Creative Size").
+  - **`files->get($reportId, $fileId)`** — no profile ID (top-level files resource). Profile ID is only needed for `reports->insert/run/delete`.
 
 - **`ReportCacheService`** — Singleton. Injects `CM360Service`. `get()` checks `report_cache` table first; if fresh (expires_at in future), returns cached payload. Otherwise fetches from CM360 and upserts cache. TTL: 2h for active campaigns, 24h for others. On CM360 error, falls back to stale cache if available; re-throws if no cache exists. `invalidate()` deletes all cache rows for a campaign.
 
@@ -240,11 +276,19 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 
 ## Brand Colors
 
-| Name | Hex |
-|------|-----|
-| Primary Green | `#1a4a2e` |
-| Primary Red | `#e8192c` |
-| Font | Inter (Google Fonts) |
+| Name | Hex | Usage |
+|------|-----|-------|
+| Brand Green | `#1a4a2e` | Header bar border, logo area only |
+| UI Blue (primary) | `#2563eb` | Buttons, active states, links, icon color |
+| Emerald (accent) | `#10b981` | Positive metrics, active badges, table bars |
+| Purple | `#8b5cf6` | CTR icon |
+| Amber | `#f59e0b` | Target/contracted icon |
+| Danger | `#ef4444` / `#dc2626` | Errors, impersonation banner |
+| Neutral | `#64748b` | Secondary text, labels |
+| Page bg | `#f8f9fa` | Page background |
+| Font | Inter (Google Fonts) | |
+
+> Dashboard UI was redesigned (modern rounded style): rounded-2xl cards, soft shadows, fade-in-up animations (staggered 50ms), pill preset buttons, animated pacing bar, rounded-full progress bars, hover row transitions.
 
 ---
 

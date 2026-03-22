@@ -6,7 +6,9 @@ use App\Http\Controllers\Api\Admin\ClientController;
 use App\Http\Controllers\Api\Admin\ImpersonationController;
 use App\Http\Controllers\Api\Admin\StatsController;
 use App\Http\Controllers\Api\Admin\UserController;
+use App\Http\Controllers\Api\Admin\VisibilityController as AdminVisibilityController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\Client\VisibilityController as ClientVisibilityController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\UmmahPassController;
 use Illuminate\Support\Facades\Route;
@@ -58,6 +60,12 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     // Cache management
     Route::post('/admin/cache/invalidate/{campaign_id}', [CacheController::class, 'invalidate']);
 
+    // Visibility settings — overview before {client_id} to avoid route conflict
+    Route::get('/admin/visibility/overview', [AdminVisibilityController::class, 'overview']);
+    Route::get('/admin/visibility/{client_id}', [AdminVisibilityController::class, 'show']);
+    Route::post('/admin/visibility/{client_id}', [AdminVisibilityController::class, 'upsert']);
+    Route::delete('/admin/visibility/{client_id}/reset', [AdminVisibilityController::class, 'reset']);
+
     // CM360 test
     Route::get('/admin/cm360-test', function () {
         try {
@@ -75,6 +83,9 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
 // Client only routes
 Route::middleware(['auth:sanctum', 'role:client'])->group(function () {
     Route::get('/client/test', fn () => response()->json(['message' => 'client access confirmed']));
+
+    // Visibility settings (client reads their own)
+    Route::get('/client/visibility', [ClientVisibilityController::class, 'index']);
 
     // Reports
     Route::get('/reports/campaigns', [ReportController::class, 'campaigns']);
