@@ -85,8 +85,8 @@ class CM360Service
 
     public function fetchConversionReport(Campaign $campaign, string $dateFrom, string $dateTo): array
     {
-        $rows = $this->runReport($this->buildConversionReport($campaign, $dateFrom, $dateTo));
-        return $this->normalizeConversion($rows);
+        $csv = $this->runReportRaw($this->buildConversionReport($campaign, $dateFrom, $dateTo));
+        return $this->normalizeConversionFromCsv($csv);
     }
 
     private function buildSummaryReport(Campaign $campaign, string $dateFrom, string $dateTo): Report
@@ -151,13 +151,13 @@ class CM360Service
     {
         $report = $this->buildStandardReport('MAN-Conversions', $dateFrom, $dateTo);
         $criteria = $report->getCriteria();
-        $criteria->setDimensions([$this->makeDimension('campaign')]);
-        $criteria->setMetricNames(['totalConversions', 'totalConversionValue']);
-        $campaignFilter = new DimensionValue();
-        $campaignFilter->setDimensionName('campaign');
-        $campaignFilter->setId($campaign->cm360_campaign_id);
-        $campaignFilter->setMatchType('EXACT');
-        $criteria->setDimensionFilters([$campaignFilter]);
+        $criteria->setDimensions([$this->makeDimension('activity')]);
+        $criteria->setMetricNames(['totalConversions', 'totalConversionsRevenue']);
+        $activityFilter = new DimensionValue();
+        $activityFilter->setDimensionName('activity');
+        $activityFilter->setId($campaign->cm360_activity_id);
+        $activityFilter->setMatchType('EXACT');
+        $criteria->setDimensionFilters([$activityFilter]);
         $report->setCriteria($criteria);
         return $report;
     }
@@ -227,13 +227,70 @@ class CM360Service
         ], $rows);
     }
 
-    private function normalizeConversion(array $rows): array
+    private function normalizeConversionFromCsv(string $csv): array
     {
-        $row = $rows[0] ?? [];
-        return [
-            'total_conversions'      => $this->parseInt($row, ['Total Conversions', 'totalConversions', 'Conversions']),
-            'total_conversion_value' => $this->parseFloat($row, ['Total Conversion Value', 'totalConversionValue']),
-        ];
+        if (empty(trim($csv))) {
+            return ['total_conversions' => 0, 'total_conversion_value' => 0.0];
+        }
+
+        $lines = explode("\n", str_replace("\r\n", "\n", $csv));
+        $lines = array_map('trim', $lines);
+
+        // Find the "Grand Total:" row — it has the summed values
+        $headers    = [];
+        $foundMarker = false;
+
+        foreach ($lines as $line) {
+            if (empty($line)) continue;
+
+            if (!$foundMarker) {
+                $bare = trim($line, '"');
+                if ($bare === 'Report Fields' || $bare === 'Report Fields:') {
+                    $foundMarker = true;
+                }
+                continue;
+            }
+
+            // First non-empty line after marker = headers
+            if (empty($headers)) {
+                $headers = array_map('trim', str_getcsv($line));
+                continue;
+            }
+
+            // Look for Grand Total row
+            if (str_starts_with($line, 'Grand Total:')) {
+                $cells = array_map('trim', str_getcsv($line));
+                // Grand Total: row has label in first cell, then values aligned to headers
+                // headers[0] = dimension (e.g. "Activity"), headers[1] = "Total Conversions", headers[2] = "Total Conversions Revenue"
+                // cells[0] = "Grand Total:", cells[1] = conversions, cells[2] = revenue
+                $row = [];
+                foreach ($headers as $i => $header) {
+                    $row[$header] = $cells[$i] ?? '';
+                }
+
+                $conversionsRaw = $this->extractValue($row, ['Total Conversions', 'Conversions', 'totalConversions']);
+                $conversions    = (int) round((float) preg_replace('/[^0-9.]/', '', $conversionsRaw));
+                $revenueRaw     = $this->extractValue($row, ['Total Conversions Revenue', 'Total Revenue', 'totalConversionsRevenue', 'Revenue']);
+                $revenue        = ($revenueRaw === '' || $revenueRaw === '---')
+                    ? 0.0
+                    : (float) preg_replace('/[^0-9.]/', '', $revenueRaw);
+
+                return [
+                    'total_conversions'      => $conversions,
+                    'total_conversion_value' => $revenue,
+                ];
+            }
+        }
+
+        // Fallback: sum data rows
+        $rows = $this->parseCsv($csv);
+        $total = 0;
+        foreach ($rows as $row) {
+            $raw    = $this->extractValue($row, ['Total Conversions', 'Conversions', 'totalConversions']);
+            $total += (int) round((float) preg_replace('/[^0-9.]/', '', $raw));
+        }
+
+        return ['total_conversions' => $total, 'total_conversion_value' => 0.0];
     }
 
     // ─── Private helpers ──────────────────────────────────────────────────────
@@ -308,6 +365,51 @@ class CM360Service
             }
 
             return $this->parseCsv($this->downloadReportFile($reportId, $fileId));
+        } finally {
+            try {
+                $this->service->reports->delete($this->profileId, $reportId);
+            } catch (\Throwable $e) {
+                Log::warning('CM360 report cleanup failed', ['report_id' => $reportId, 'error' => $e->getMessage()]);
+            }
+        }
+    }
+
+    /**
+     * Like runReport() but returns the raw CSV string instead of parsed rows.
+     * Used for reports where we need to inspect the Grand Total row.
+     *
+     * @throws \RuntimeException
+     */
+    private function runReportRaw(Report $report): string
+    {
+        $inserted = $this->service->reports->insert($this->profileId, $report);
+        $reportId = $inserted->getId();
+
+        try {
+            $file   = $this->service->reports->run($this->profileId, $reportId);
+            $fileId = $file->getId();
+
+            $maxAttempts = 60;
+            for ($i = 0; $i < $maxAttempts; $i++) {
+                $status = $file->getStatus();
+
+                if ($status === 'REPORT_AVAILABLE') {
+                    break;
+                }
+
+                if ($status === 'FAILED') {
+                    throw new \RuntimeException('CM360 report generation failed (FAILED status).');
+                }
+
+                sleep(2);
+                $file = $this->service->files->get($reportId, $fileId);
+            }
+
+            if ($file->getStatus() !== 'REPORT_AVAILABLE') {
+                throw new \RuntimeException('CM360 report timed out after 120 seconds.');
+            }
+
+            return $this->downloadReportFile($reportId, $fileId);
         } finally {
             try {
                 $this->service->reports->delete($this->profileId, $reportId);
