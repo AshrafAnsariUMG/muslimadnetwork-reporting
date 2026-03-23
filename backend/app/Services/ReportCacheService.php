@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Campaign;
+use App\Models\CreativeCache;
 use App\Models\ReportCache;
 use Illuminate\Support\Facades\Log;
 
@@ -65,6 +66,63 @@ class ReportCacheService
     public function invalidate(Campaign $campaign): void
     {
         ReportCache::where('campaign_id', $campaign->id)->delete();
+    }
+
+    /**
+     * Return creative metadata keyed by name.
+     * Cached for 24h in creative_cache table; falls back to empty array on error.
+     */
+    public function getCreativeMetadata(Campaign $campaign): array
+    {
+        $cached = CreativeCache::where('campaign_id', $campaign->id)
+            ->where('expires_at', '>', now())
+            ->get();
+
+        if ($cached->isNotEmpty()) {
+            $result = [];
+            foreach ($cached as $item) {
+                $result[$item->name] = [
+                    'id'          => $item->cm360_creative_id,
+                    'name'        => $item->name,
+                    'type'        => $item->type,
+                    'width'       => $item->width,
+                    'height'      => $item->height,
+                    'preview_url' => $item->preview_url,
+                ];
+            }
+            return $result;
+        }
+
+        try {
+            $metadata  = $this->cm360->fetchCreativeMetadata($campaign);
+            $expiresAt = now()->addHours(24);
+
+            foreach ($metadata as $data) {
+                CreativeCache::updateOrCreate(
+                    [
+                        'campaign_id'       => $campaign->id,
+                        'cm360_creative_id' => $data['id'],
+                    ],
+                    [
+                        'name'        => $data['name'],
+                        'type'        => $data['type'],
+                        'width'       => $data['width'],
+                        'height'      => $data['height'],
+                        'preview_url' => $data['preview_url'],
+                        'fetched_at'  => now(),
+                        'expires_at'  => $expiresAt,
+                    ]
+                );
+            }
+
+            return $metadata;
+        } catch (\Throwable $e) {
+            Log::error('getCreativeMetadata failed', [
+                'campaign_id' => $campaign->id,
+                'error'       => $e->getMessage(),
+            ]);
+            return [];
+        }
     }
 
     private function fetchFromCM360(Campaign $campaign, string $dateFrom, string $dateTo, string $type): array

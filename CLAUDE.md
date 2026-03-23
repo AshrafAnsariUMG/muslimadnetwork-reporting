@@ -33,7 +33,7 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 │   │   │   ├── Controllers/Api/
 │   │   │   │   ├── AuthController.php
 │   │   │   │   ├── UmmahPassController.php
-│   │   │   │   ├── ReportController.php          # Client report endpoints + pacing() (campaign-start to today, date-range independent)
+│   │   │   │   ├── ReportController.php          # Client report endpoints + pacing() + creativesMetadata()
 │   │   │   │   ├── PasswordResetController.php   # forgot-password + reset-password
 │   │   │   │   └── Admin/
 │   │   │   │       ├── ClientController.php
@@ -52,14 +52,15 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 │   │   │   └── Middleware/
 │   │   │       └── RoleMiddleware.php
 │   │   ├── Services/
-│   │   │   ├── CM360Service.php              # Google CM360 API integration
+│   │   │   ├── CM360Service.php              # Google CM360 API integration + fetchCreativeMetadata() (Creatives API, not report)
 │   │   │   ├── GmailMailerService.php        # Gmail API mailer (OAuth2 refresh token, bypasses Laravel mail)
-│   │   │   └── ReportCacheService.php        # TTL caching layer over CM360Service
+│   │   │   └── ReportCacheService.php        # TTL caching layer over CM360Service + getCreativeMetadata() (24h TTL)
 │   │   └── Models/
 │   │       ├── User.php
 │   │       ├── Client.php
 │   │       ├── Campaign.php
 │   │       ├── ReportCache.php
+│   │       ├── CreativeCache.php            # campaign_id, cm360_creative_id, name, type, width, height, preview_url, expires_at; 24h TTL
 │   │       ├── ClientVisibilitySetting.php
 │   │       ├── AdminAuditLog.php
 │   │       ├── Offer.php                    # title, body, cta_label, cta_url, target, client_id, is_active, starts_at, ends_at
@@ -104,7 +105,8 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
     ├── hooks/
     │   ├── useReport.ts                 # Generic report data hook (type, dateFrom, dateTo, campaignId); clears data on dep change
     │   ├── useVisibility.ts             # Fetches /api/client/visibility; isHidden(section, rowKey?), toggle()
-    │   └── useOffers.ts                 # Fetches /api/client/offers; dismissOffer(id) optimistic update
+    │   ├── useOffers.ts                 # Fetches /api/client/offers; dismissOffer(id) optimistic update
+    │   └── useCreativeMetadata.ts       # Fetches /api/reports/creatives/metadata; returns Record<name, CreativeMetadata>; refetches on campaignId change
     ├── types/
     │   └── reports.ts                   # TS interfaces: SummaryReport, DeviceRow, DomainRow, AppRow, SiteBreakdown, CreativeRow, ConversionReport, Campaign, Client
     ├── lib/
@@ -121,7 +123,8 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
     │       ├── DeviceBreakdownChart.tsx # Recharts doughnut chart; colored by device type; custom tooltip; legend with % share
     │       ├── DomainBreakdownCards.tsx # Top-10 card grid (2-col desktop); impression share bar; "View All" modal with search
     │       ├── AppBreakdownCards.tsx   # Same as DomainBreakdownCards but purple rank circles; "View All" modal with search
-    │       ├── CreativeBreakdownTable.tsx # Creative rows, top 10; rank col; size badge; impression bar; "View All" modal with search
+    │       ├── CreativeBreakdownGrid.tsx  # Creative card grid (3-col desktop, 2 tablet, 1 mobile); iframe preview; click → CreativePreviewModal; top 6 + "Show All" modal
+│       ├── CreativePreviewModal.tsx   # Full-size iframe preview modal; ESC/backdrop closes; stats row (impressions/clicks/CTR/share); scales oversized creatives
     │       ├── ConversionCard.tsx       # Renders nothing if available=false
     │       ├── VisibilityToggle.tsx     # Eye/eye-off icon button; only renders when impersonation_token in localStorage
     │       ├── OfferBanner.tsx          # Single offer banner; gradient green bg; fade-out on dismiss
@@ -187,6 +190,7 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 | `clients` | Advertiser clients — no longer stores CM360 IDs (those are global in .env) |
 | `campaigns` | CM360 campaigns linked to clients; optionally have `cm360_activity_id` for conversion tracking |
 | `report_cache` | Cached CM360 report payloads with expiry |
+| `creative_cache` | Cached CM360 creative metadata (id, name, type, size, preview_url) — 24h TTL per campaign |
 | `client_visibility_settings` | Per-client show/hide settings for sections and table rows |
 | `offers` | Promotional offers shown in portal (global or per-client) |
 | `offer_dismissals` | Tracks which users dismissed which offers |
@@ -254,6 +258,7 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 | GET | `/api/reports/device` | Device breakdown |
 | GET | `/api/reports/site` | Site breakdown |
 | GET | `/api/reports/creative` | Creative breakdown |
+| GET | `/api/reports/creatives/metadata` | Creative metadata from CM360 Creatives API (id, name, type, width, height, preview_url); 24h cache in creative_cache table |
 | GET | `/api/reports/conversion` | Conversion report (requires has_conversion_tracking) |
 | GET | `/api/client/visibility` | Returns grouped visibility settings for the authenticated client |
 | GET | `/api/client/offers` | Returns active non-dismissed offers for user's client |

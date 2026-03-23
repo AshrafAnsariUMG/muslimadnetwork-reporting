@@ -84,6 +84,47 @@ class CM360Service
         return $this->normalizeConversionFromCsv($csv);
     }
 
+    /**
+     * Fetch creative metadata (id, name, type, size, preview_url) from the
+     * CM360 Creatives API — not a report, a direct resource list.
+     * Returns array keyed by creative name for easy lookup.
+     * Returns empty array on any error — never crashes the caller.
+     */
+    public function fetchCreativeMetadata(Campaign $campaign): array
+    {
+        try {
+            $response = $this->service->creatives->listCreatives(
+                $this->profileId,
+                [
+                    'campaignIds' => $campaign->cm360_campaign_id,
+                    'maxResults'  => 1000,
+                ]
+            );
+
+            $result = [];
+            foreach ($response->getCreatives() ?? [] as $creative) {
+                $size   = $creative->getSize();
+                $name   = (string) $creative->getName();
+                $result[$name] = [
+                    'id'          => (string) $creative->getId(),
+                    'name'        => $name,
+                    'type'        => (string) $creative->getType(),
+                    'width'       => $size ? (int) $size->getWidth() : 0,
+                    'height'      => $size ? (int) $size->getHeight() : 0,
+                    'preview_url' => $creative->getPreviewUrl() ?: null,
+                ];
+            }
+
+            return $result;
+        } catch (\Throwable $e) {
+            Log::error('CM360 fetchCreativeMetadata failed', [
+                'campaign_id' => $campaign->id,
+                'error'       => $e->getMessage(),
+            ]);
+            return [];
+        }
+    }
+
     private function buildSummaryReport(Campaign $campaign, string $dateFrom, string $dateTo): Report
     {
         $report = $this->buildStandardReport('MAN-Summary', $dateFrom, $dateTo);

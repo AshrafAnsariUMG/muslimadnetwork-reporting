@@ -61,6 +61,33 @@ class ReportController extends Controller
         return response()->json($this->cache->get($campaign, $dateFrom, $dateTo, 'conversion'));
     }
 
+    public function creativesMetadata(Request $request): JsonResponse
+    {
+        $request->validate(['campaign_id' => 'sometimes|integer']);
+
+        $client = $request->user()->client;
+        if (!$client) {
+            abort(422, 'No client associated with this user.');
+        }
+
+        if ($client->client_type->value === 'multi_campaign') {
+            if (!$request->has('campaign_id')) {
+                abort(422, 'campaign_id is required for multi-campaign clients.');
+            }
+            $campaign = Campaign::where('id', $request->integer('campaign_id'))
+                ->where('client_id', $client->id)
+                ->firstOrFail();
+        } else {
+            $campaign = Campaign::where('client_id', $client->id)
+                ->where('is_primary', true)
+                ->firstOrFail();
+        }
+
+        $metadata = $this->cache->getCreativeMetadata($campaign);
+
+        return response()->json(array_values($metadata));
+    }
+
     public function pacing(Request $request): JsonResponse
     {
         $request->validate(['campaign_id' => 'sometimes|integer']);
