@@ -35,6 +35,7 @@ class CM360Service
             $this->client->setClientId(config('services.cm360.client_id'));
             $this->client->setClientSecret(config('services.cm360.client_secret'));
             $this->client->addScope(Dfareporting::DFAREPORTING);
+            $this->client->addScope(Dfareporting::DFATRAFFICKING);
             $this->client->setAccessType('offline');
 
             $tokenData = $this->client->fetchAccessTokenWithRefreshToken(
@@ -96,7 +97,7 @@ class CM360Service
             $response = $this->service->creatives->listCreatives(
                 $this->profileId,
                 [
-                    'campaignIds' => $campaign->cm360_campaign_id,
+                    'campaignId' => $campaign->cm360_campaign_id,
                     'maxResults'  => 1000,
                 ]
             );
@@ -117,10 +118,20 @@ class CM360Service
 
             return $result;
         } catch (\Throwable $e) {
-            Log::error('CM360 fetchCreativeMetadata failed', [
-                'campaign_id' => $campaign->id,
-                'error'       => $e->getMessage(),
-            ]);
+            $msg = $e->getMessage();
+            // DFATRAFFICKING scope is required for the Creatives API.
+            // If the refresh token was created with only DFAREPORTING scope,
+            // re-run the CM360 OAuth flow with both scopes to fix this.
+            if (str_contains($msg, 'insufficientPermissions') || str_contains($msg, 'ACCESS_TOKEN_SCOPE_INSUFFICIENT')) {
+                Log::warning('CM360 fetchCreativeMetadata: insufficient scope. Re-authorize CM360 OAuth with dfatrafficking scope to enable creative previews.', [
+                    'campaign_id' => $campaign->id,
+                ]);
+            } else {
+                Log::error('CM360 fetchCreativeMetadata failed', [
+                    'campaign_id' => $campaign->id,
+                    'error'       => $msg,
+                ]);
+            }
             return [];
         }
     }
