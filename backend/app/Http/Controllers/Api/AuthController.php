@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
@@ -48,5 +49,23 @@ class AuthController extends Controller
         $user = $request->user()->load('client');
 
         return response()->json($user);
+    }
+
+    public function changePassword(Request $request): JsonResponse
+    {
+        $request->validate([
+            'current_password' => ['required', 'string'],
+            'new_password'     => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $user = $request->user();
+
+        if (!Hash::check($request->current_password, $user->password)) {
+            return response()->json(['errors' => ['current_password' => ['Current password is incorrect.']]], 422);
+        }
+
+        $user->update(['password' => Hash::make($request->new_password)]);
+
+        return response()->json(['message' => 'Password changed successfully.']);
     }
 }

@@ -30,6 +30,7 @@ Route::post('/auth/reset-password', [PasswordResetController::class, 'resetPassw
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me', [AuthController::class, 'me']);
+    Route::put('/auth/password', [AuthController::class, 'changePassword']);
 
     // Impersonation stop — accessible by impersonated client user
     Route::post('/admin/impersonate/stop', [ImpersonationController::class, 'stop']);
