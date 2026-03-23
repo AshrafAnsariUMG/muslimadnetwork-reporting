@@ -20,7 +20,7 @@ class CreativeEvaluationService
             } elseif ($ctr >= $campaignCtr * 0.5) {
                 $status = 'average';
             } else {
-                $status = 'underperforming';
+                $status = 'refresh_opportunity';
             }
 
             // ── vs campaign average ───────────────────────────────────────────
@@ -33,19 +33,22 @@ class CreativeEvaluationService
                 ? round((($ctr - $networkAvgCtr) / $networkAvgCtr) * 100, 1)
                 : 0.0;
 
-            // ── Fatigue risk (v1: high volume + below network avg) ────────────
+            // ── Fatigue risk (high volume + below network avg) ────────────────
             $fatigueRisk = $impressions > 100000 && $ctr < $networkAvgCtr;
+
+            // Fatigue risk overrides status to ready_for_refresh
+            if ($fatigueRisk) {
+                $status = 'ready_for_refresh';
+            }
 
             // ── Recommendation ────────────────────────────────────────────────
             $recommendation = null;
-            if ($fatigueRisk) {
-                $recommendation = 'This creative has high impression volume with below-average CTR. It may be experiencing audience fatigue.';
-            } elseif ($status === 'top_performer') {
-                $recommendation = 'This creative is driving strong results. Consider increasing its weight.';
-            } elseif ($status === 'underperforming') {
-                $recommendation = 'This creative has low CTR with sufficient impressions. Consider pausing or refreshing it.';
-            } elseif ($status === 'insufficient_data') {
-                $recommendation = 'More impressions needed for a reliable assessment.';
+            if ($status === 'top_performer') {
+                $recommendation = 'This creative is leading your campaign. Consider using it as a template for new creatives.';
+            } elseif ($status === 'refresh_opportunity') {
+                $recommendation = 'A creative refresh could help boost this placement. Contact your account manager to explore new creative options.';
+            } elseif ($status === 'ready_for_refresh') {
+                $recommendation = 'This creative has delivered strong exposure. Introducing a fresh version could re-engage your audience and improve results.';
             }
 
             return array_merge($creative, [
