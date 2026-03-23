@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
+use App\Models\ClientVisit;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -47,6 +48,40 @@ class AuthController extends Controller
     public function me(Request $request): JsonResponse
     {
         $user = $request->user()->load('client');
+
+        if ($user->role === UserRole::Client && $user->client_id) {
+            $now = now();
+            $debounceWindow = $now->copy()->subHour();
+
+            $lastVisit = ClientVisit::where('user_id', $user->id)
+                ->where('client_id', $user->client_id)
+                ->orderByDesc('visited_at')
+                ->first();
+
+            // Record a new visit only if no visit within last hour
+            $shouldRecord = !$lastVisit || $lastVisit->visited_at->lt($debounceWindow);
+
+            if ($shouldRecord) {
+                // Return the previous visit timestamp before recording this one
+                $lastVisitedAt = $lastVisit?->visited_at?->toIso8601String();
+
+                ClientVisit::create([
+                    'user_id'    => $user->id,
+                    'client_id'  => $user->client_id,
+                    'visited_at' => $now,
+                ]);
+            } else {
+                // Within debounce window — return the visit before the most recent one
+                $secondLast = ClientVisit::where('user_id', $user->id)
+                    ->where('client_id', $user->client_id)
+                    ->orderByDesc('visited_at')
+                    ->skip(1)
+                    ->first();
+                $lastVisitedAt = $secondLast?->visited_at?->toIso8601String();
+            }
+
+            return response()->json(array_merge($user->toArray(), ['last_visited_at' => $lastVisitedAt]));
+        }
 
         return response()->json($user);
     }
