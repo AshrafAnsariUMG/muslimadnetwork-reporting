@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\Client\VisibilityController as ClientVisibilityController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\Reports\CampaignSummaryController;
 use App\Http\Controllers\Api\UmmahPassController;
 use Illuminate\Support\Facades\Route;
 
@@ -99,6 +100,11 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::get('/admin/test', fn () => response()->json(['message' => 'admin access confirmed']));
 });
 
+// PDF report — accessible by any authenticated user (client scoped to own campaigns, admin by campaign_id)
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/reports/campaign-summary/pdf', [CampaignSummaryController::class, 'pdf']);
+});
+
 // Client only routes
 Route::middleware(['auth:sanctum', 'role:client'])->group(function () {
     Route::get('/client/test', fn () => response()->json(['message' => 'client access confirmed']));
@@ -108,7 +114,7 @@ Route::middleware(['auth:sanctum', 'role:client'])->group(function () {
 
     // Offers
     Route::get('/client/offers', [OfferController::class, 'index']);
-    Route::post('/client/offers/{id}/dismiss', [OfferController::class, 'dismiss']);
+    Route::post('/client/offers/{id}/dismiss', [OfferController::class, 'dismiss'])->where('id', '.*');
 
     // Reports
     Route::get('/reports/campaigns',           [ReportController::class, 'campaigns']);

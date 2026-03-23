@@ -15,6 +15,7 @@ class Client extends Model
         'client_type',
         'is_active',
         'features',
+        'intelligent_offers_enabled',
         'notes',
     ];
 
@@ -23,6 +24,7 @@ class Client extends Model
         return [
             'features' => 'array',
             'is_active' => 'boolean',
+            'intelligent_offers_enabled' => 'boolean',
             'client_type' => ClientType::class,
         ];
     }

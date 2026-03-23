@@ -52,6 +52,7 @@ class ClientController extends Controller
             'notes' => ['nullable', 'string'],
             'features' => ['nullable', 'array'],
             'is_active' => ['boolean'],
+            'intelligent_offers_enabled' => ['boolean'],
         ]);
 
         $client->update($data);

@@ -34,6 +34,8 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 │   │   │   │   ├── AuthController.php
 │   │   │   │   ├── UmmahPassController.php
 │   │   │   │   ├── ReportController.php          # Client report endpoints + pacing() + creativesMetadata()
+│   │   │   │   ├── Reports/
+│   │   │   │   │   └── CampaignSummaryController.php  # GET /api/reports/campaign-summary/pdf (client+admin)
 │   │   │   │   ├── PasswordResetController.php   # forgot-password + reset-password
 │   │   │   │   └── Admin/
 │   │   │   │       ├── ClientController.php
@@ -48,23 +50,26 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 │   │   │   │       └── VisibilityController.php  # Admin visibility CRUD (overview/show/upsert/reset)
 │   │   │   └── Client/
 │   │   │       ├── VisibilityController.php      # Client reads own visibility settings
-│   │   │       └── OfferController.php           # GET /api/client/offers (active, non-dismissed); POST /api/client/offers/{id}/dismiss
+│   │   │       └── OfferController.php           # GET /api/client/offers (manual + intelligent, non-dismissed); POST /api/client/offers/{id}/dismiss (handles "intelligent_*" IDs)
 │   │   │   └── Middleware/
 │   │   │       └── RoleMiddleware.php
 │   │   ├── Services/
 │   │   │   ├── CM360Service.php              # Google CM360 API integration + fetchCreativeMetadata() (Creatives API, not report)
 │   │   │   ├── GmailMailerService.php        # Gmail API mailer (OAuth2 refresh token, bypasses Laravel mail)
-│   │   │   └── ReportCacheService.php        # TTL caching layer over CM360Service + getCreativeMetadata() (24h TTL)
+│   │   │   ├── ReportCacheService.php        # TTL caching layer over CM360Service + getCreativeMetadata() (24h TTL)
+│   │   │   └── IntelligentOfferService.php   # Performance-triggered upsell offers; getOffersForCampaign(); 4 triggers
 │   │   └── Models/
 │   │       ├── User.php
-│   │       ├── Client.php
+│   │       ├── Client.php                   # + intelligent_offers_enabled (boolean, default false)
 │   │       ├── Campaign.php
 │   │       ├── ReportCache.php
 │   │       ├── CreativeCache.php            # campaign_id, cm360_creative_id, name, type, width, height, preview_url, expires_at; 24h TTL
 │   │       ├── ClientVisibilitySetting.php
 │   │       ├── AdminAuditLog.php
 │   │       ├── Offer.php                    # title, body, cta_label, cta_url, target, client_id, is_active, starts_at, ends_at
-│   │       └── OfferDismissal.php           # user_id, offer_id, dismissed_at; unique(user_id, offer_id)
+│   │       ├── OfferDismissal.php           # user_id, offer_id, dismissed_at; unique(user_id, offer_id)
+│   │       ├── IntelligentOfferDismissal.php # user_id, trigger_name, dismissed_at; unique(user_id, trigger_name)
+│   │       └── ClientVisit.php              # user_id, client_id, visited_at; index(user_id, client_id, visited_at)
 │   ├── config/
 │   │   ├── cors.php
 │   │   ├── sanctum.php
@@ -128,7 +133,10 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
     │       ├── ConversionCard.tsx       # Renders nothing if available=false
     │       ├── VisibilityToggle.tsx     # Eye/eye-off icon button; only renders when impersonation_token in localStorage
     │       ├── OfferBanner.tsx          # Single offer banner; gradient green bg; fade-out on dismiss
-    │       └── OffersStack.tsx          # Renders first banner + "+N more" expand pill; uses OfferBanner
+    │       ├── OffersStack.tsx          # Renders first banner + "+N more" expand pill; uses OfferBanner
+    │       ├── CampaignHealthScore.tsx  # Circular SVG arc 0–100; color-coded; animated; info tooltip
+    │       ├── SinceLastVisit.tsx       # Shows last visit relative time + campaign progress bar
+    │       └── BenchmarkBadge.tsx       # CTR vs network average pill (above/below)
     ├── components/
     │   └── ui/
     │       ├── Toast.tsx               # Toast component + useToast() hook (showToast, ToastContainer); auto-dismisses 2s
@@ -195,6 +203,8 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 | `client_visibility_settings` | Per-client show/hide settings for sections and table rows |
 | `offers` | Promotional offers shown in portal (global or per-client) |
 | `offer_dismissals` | Tracks which users dismissed which offers |
+| `intelligent_offer_dismissals` | Tracks dismissed intelligent (trigger-based) offers; user_id + trigger_name |
+| `client_visits` | Per-user visit log for "since last visit" tracking; 1h debounce in me() |
 | `reporting_password_resets` | Password reset tokens — email, sha256-hashed token, created_at. TTL 60 min, single-use. |
 | `admin_audit_log` | Audit trail for admin actions, including impersonation |
 | `personal_access_tokens` | Sanctum API tokens |
@@ -262,8 +272,9 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 | GET | `/api/reports/creatives/metadata` | Creative metadata from CM360 Creatives API (id, name, type, width, height, preview_url); 24h cache in creative_cache table |
 | GET | `/api/reports/conversion` | Conversion report (requires has_conversion_tracking) |
 | GET | `/api/client/visibility` | Returns grouped visibility settings for the authenticated client |
-| GET | `/api/client/offers` | Returns active non-dismissed offers for user's client |
-| POST | `/api/client/offers/{id}/dismiss` | Record offer dismissal for authenticated user |
+| GET | `/api/client/offers` | Returns active non-dismissed offers (manual + intelligent) for user's client |
+| POST | `/api/client/offers/{id}/dismiss` | Record offer dismissal; `{id}` can be integer (manual) or `"intelligent_{trigger}"` (intelligent) |
+| GET | `/api/reports/campaign-summary/pdf` | Download full campaign PDF report (client + admin; no role restriction beyond auth) |
 
 > Report endpoints accept query params: `date_from` (Y-m-d), `date_to` (Y-m-d), and optionally `campaign_id` (required for multi_campaign clients).
 > `/api/reports/pacing` only accepts optional `campaign_id` — it ignores date range and always uses campaign `start_date` → today.
@@ -341,6 +352,10 @@ Admins can hide/show entire sections or individual table rows per client while i
 > Dashboard UI was redesigned (modern rounded style): rounded-2xl cards, soft shadows, fade-in-up animations (staggered 50ms), pill preset buttons, animated pacing bar, rounded-full progress bars, hover row transitions.
 >
 > Session 8.2 — Islamic design elements added to client dashboard: gold CSS variables (--gold, --gold-light, --gold-dark), IslamicDivider SVG component (8-pointed star pattern), gold top border + gradient icon on StatCards, gold pacing bar (on-pace state), gold-bordered campaign switcher active pill, green-to-gold offer banner gradient, gold section heading underlines with star icons, Bismillah calligraphy in header, gold header border.
+>
+> Session 8.3 — Campaign intelligence: client_visits table + AuthController me() records visits with 1h debounce + returns last_visited_at. Summary endpoint adds network_avg_ctr, ctr_vs_benchmark, health_score, health_label. CampaignHealthScore, SinceLastVisit, BenchmarkBadge components. Top Performer badge on highest-CTR creative. StatCard accepts ctrVsBenchmark prop.
+>
+> Session 8.4 — Intelligent offers: intelligent_offers_enabled flag on clients (admin toggle in UI). IntelligentOfferService with 4 performance triggers (behind pace, ending soon, strong CTR, just started). Separate intelligent_offer_dismissals table. PDF report: barryvdh/laravel-dompdf, CampaignSummaryController, 6-page Blade PDF (cover, executive summary, device, domains/apps, creatives, closing). "Download Report" gold button in dashboard header.
 
 ---
 
