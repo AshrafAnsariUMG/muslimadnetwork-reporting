@@ -189,6 +189,7 @@ class CM360Service
         $criteria->setDimensions([
             $this->makeDimension('domain'),
             $this->makeDimension('app'),
+            $this->makeDimension('appId'),
         ]);
         $criteria->setMetricNames(['impressions', 'clicks', 'clickRate']);
         $this->addCampaignFilter($criteria, $campaign->cm360_campaign_id);
@@ -250,11 +251,14 @@ class CM360Service
     private function normalizeSiteBreakdown(array $rows): array
     {
         // Aggregate by display name, tracking whether each is a domain or app
-        $buckets = []; // displayName => ['impressions'=>int, 'clicks'=>int, 'is_app'=>bool]
+        // buckets: displayName => ['impressions'=>int, 'clicks'=>int, 'is_app'=>bool, 'app_id'=>string|null]
+        $buckets = [];
 
         foreach ($rows as $row) {
             $domain = $this->extractValue($row, ['Domain', 'domain']);
             $app    = $this->extractValue($row, ['App', 'app']);
+            $appIdRaw = $this->extractValue($row, ['App ID', 'appId']);
+            $appId  = ($appIdRaw !== '' && $appIdRaw !== '(not set)') ? $appIdRaw : null;
 
             $impressions = $this->parseInt($row, ['Impressions', 'impressions']);
             $clicks      = $this->parseInt($row, ['Clicks', 'clicks']);
@@ -283,7 +287,15 @@ class CM360Service
             }
 
             if (!isset($buckets[$displayName])) {
-                $buckets[$displayName] = ['impressions' => 0, 'clicks' => 0, 'is_app' => $isApp];
+                $buckets[$displayName] = [
+                    'impressions' => 0,
+                    'clicks'      => 0,
+                    'is_app'      => $isApp,
+                    'app_id'      => $appId,
+                ];
+            } elseif ($isApp && $buckets[$displayName]['app_id'] === null && $appId !== null) {
+                // Capture app_id on first row that has it
+                $buckets[$displayName]['app_id'] = $appId;
             }
             $buckets[$displayName]['impressions'] += $impressions;
             $buckets[$displayName]['clicks']      += $clicks;
@@ -306,7 +318,7 @@ class CM360Service
             ];
 
             if ($data['is_app']) {
-                $apps[] = array_merge(['app' => $name], $entry);
+                $apps[] = array_merge(['app' => $name, 'app_id' => $data['app_id']], $entry);
             } else {
                 $domains[] = array_merge(['domain' => $name], $entry);
             }
