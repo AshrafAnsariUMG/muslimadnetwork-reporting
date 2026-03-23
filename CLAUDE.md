@@ -141,7 +141,8 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
     ├── components/
     │   └── ui/
     │       ├── Toast.tsx               # Toast component + useToast() hook (showToast, ToastContainer); auto-dismisses 2s
-    │       └── IslamicDivider.tsx      # Islamic geometric section divider; variant="full" (star medallion center) or "simple" (repeating band); gold #C9A84C; opacity 0.6
+    │       ├── IslamicDivider.tsx      # Islamic geometric section divider; variant="full" (star medallion center) or "simple" (repeating band); gold #C9A84C; opacity 0.35
+    │       └── IslamicWatermark.tsx    # Fixed full-page SVG background watermark; 8-pointed star tile pattern; opacity 0.025; color #1a4a2e; z-index 0; pointer-events none
     └── .env
 ```
 
@@ -361,6 +362,8 @@ Admins can hide/show entire sections or individual table rows per client while i
 > Session 8.5 — Creative evaluation: CreativeEvaluationService injected into ReportController::creative(). Adds performance_status (top_performer/strong/average/underperforming/insufficient_data), vs_campaign_avg %, vs_network_avg %, fatigue_risk bool, recommendation string. CreativeBreakdownGrid: status badges (⭐💪⚠️😴), recommendation tooltip (ℹ️), vs-campaign-avg line below bar, InsightsSummary filter row (clickable counts, clear filter). CreativePreviewModal: evaluation section with status badge, benchmark pills, fatigue warning box, recommendation box.
 >
 > Session 8.5.1 — Dashboard UI fixes: (1) Removed "Download Report" PDF button and related state/handler from dashboard/page.tsx. (2) Redesigned CampaignHealthScore as a stat card matching StatCard style — gold icon bg, heart-pulse icon, score/100 value, label badge, info tooltip, visibility toggle props. (3) Added MuslimReach stat card (value = impressions ÷ 5, mosque icon, info tooltip). (4) Per-card visibility toggles on all 6 stat cards: stat_impressions, stat_clicks, stat_ctr, stat_muslimreach, stat_health, stat_conversions — eye icon top-right of each card when impersonating; hidden+impersonating = 0.3 opacity; hidden+not impersonating = null. Summary grid changed to grid-cols-1 sm:grid-cols-2 lg:grid-cols-3. StatCard gains isImpersonating, isHidden, onVisibilityToggle, infoTooltip props. CampaignHealthScore moved into the summary grid (no longer a separate section below).
+>
+> Session 8.2.1 — Islamic design refinement: (1) Gold reduced to borders only — StatCard uses 4-sided gold border (1px solid #C9A84C), icon backgrounds revert to colored (blue/emerald/purple), hover is now translateY(-3px) + shadow instead of gold glow. (2) PacingBar "on pace" badge: white bg + gold border + gold text; bar fill changed from gold to green #10b981. (3) CampaignSwitcher active pill: removed gold border, uses inset box-shadow for subtle gold left accent; inactive pills hover adds gold border + scale(1.02). (4) OfferBanner: solid dark green #1a4a2e bg + 2px gold border; CTA button white bg with dark green text + gold border. (5) Header gold border opacity reduced to 0.4. (6) "Campaign Performance" heading: removed gradient text, plain dark. (7) IslamicDivider opacity 0.6→0.35, stroke-width 0.7→0.5. (8) IslamicWatermark SVG component created — fixed full-page 8-pointed star geometric tile pattern, opacity 0.025, z-index 0, color #1a4a2e; added to dashboard/layout.tsx. (9) Domain/App breakdown cards: added 1px #e5e7eb border, hover gets gold border + translateY(-2px). (10) Creative cards: added 1px #e5e7eb border, hover gets gold border + translateY(-3px). (11) SectionCard: hover increases box-shadow.
 
 ---
 
