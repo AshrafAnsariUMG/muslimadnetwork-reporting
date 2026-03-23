@@ -135,7 +135,7 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
     │       ├── VisibilityToggle.tsx     # Eye/eye-off icon button; only renders when impersonation_token in localStorage
     │       ├── OfferBanner.tsx          # Single offer banner; gradient green bg; fade-out on dismiss
     │       ├── OffersStack.tsx          # Renders first banner + "+N more" expand pill; uses OfferBanner
-    │       ├── CampaignHealthScore.tsx  # Circular SVG arc 0–100; color-coded; animated; info tooltip
+    │       ├── CampaignHealthScore.tsx  # Stat card style (matches StatCard); gold icon bg; score/100 + label badge; info tooltip; visibility toggle props
     │       ├── SinceLastVisit.tsx       # Shows last visit relative time + campaign progress bar
     │       └── BenchmarkBadge.tsx       # CTR vs network average pill (above/below)
     ├── components/
@@ -275,7 +275,7 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 | GET | `/api/client/visibility` | Returns grouped visibility settings for the authenticated client |
 | GET | `/api/client/offers` | Returns active non-dismissed offers (manual + intelligent) for user's client |
 | POST | `/api/client/offers/{id}/dismiss` | Record offer dismissal; `{id}` can be integer (manual) or `"intelligent_{trigger}"` (intelligent) |
-| GET | `/api/reports/campaign-summary/pdf` | Download full campaign PDF report (client + admin; no role restriction beyond auth) |
+| GET | `/api/reports/campaign-summary/pdf` | Download full campaign PDF report (client + admin; no role restriction beyond auth) — backend exists but frontend button removed in 8.5.1 |
 
 > Report endpoints accept query params: `date_from` (Y-m-d), `date_to` (Y-m-d), and optionally `campaign_id` (required for multi_campaign clients).
 > `/api/reports/pacing` only accepts optional `campaign_id` — it ignores date range and always uses campaign `start_date` → today.
@@ -359,6 +359,8 @@ Admins can hide/show entire sections or individual table rows per client while i
 > Session 8.4 — Intelligent offers: intelligent_offers_enabled flag on clients (admin toggle in UI). IntelligentOfferService with 4 performance triggers (behind pace, ending soon, strong CTR, just started). Separate intelligent_offer_dismissals table. PDF report: barryvdh/laravel-dompdf, CampaignSummaryController, 6-page Blade PDF (cover, executive summary, device, domains/apps, creatives, closing). "Download Report" gold button in dashboard header.
 >
 > Session 8.5 — Creative evaluation: CreativeEvaluationService injected into ReportController::creative(). Adds performance_status (top_performer/strong/average/underperforming/insufficient_data), vs_campaign_avg %, vs_network_avg %, fatigue_risk bool, recommendation string. CreativeBreakdownGrid: status badges (⭐💪⚠️😴), recommendation tooltip (ℹ️), vs-campaign-avg line below bar, InsightsSummary filter row (clickable counts, clear filter). CreativePreviewModal: evaluation section with status badge, benchmark pills, fatigue warning box, recommendation box.
+>
+> Session 8.5.1 — Dashboard UI fixes: (1) Removed "Download Report" PDF button and related state/handler from dashboard/page.tsx. (2) Redesigned CampaignHealthScore as a stat card matching StatCard style — gold icon bg, heart-pulse icon, score/100 value, label badge, info tooltip, visibility toggle props. (3) Added MuslimReach stat card (value = impressions ÷ 5, mosque icon, info tooltip). (4) Per-card visibility toggles on all 6 stat cards: stat_impressions, stat_clicks, stat_ctr, stat_muslimreach, stat_health, stat_conversions — eye icon top-right of each card when impersonating; hidden+impersonating = 0.3 opacity; hidden+not impersonating = null. Summary grid changed to grid-cols-1 sm:grid-cols-2 lg:grid-cols-3. StatCard gains isImpersonating, isHidden, onVisibilityToggle, infoTooltip props. CampaignHealthScore moved into the summary grid (no longer a separate section below).
 
 ---
 
