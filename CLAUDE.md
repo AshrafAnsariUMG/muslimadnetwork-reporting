@@ -33,7 +33,7 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 │   │   │   ├── Controllers/Api/
 │   │   │   │   ├── AuthController.php
 │   │   │   │   ├── UmmahPassController.php
-│   │   │   │   ├── ReportController.php          # Client report endpoints
+│   │   │   │   ├── ReportController.php          # Client report endpoints + pacing() (campaign-start to today, date-range independent)
 │   │   │   │   ├── PasswordResetController.php   # forgot-password + reset-password
 │   │   │   │   └── Admin/
 │   │   │   │       ├── ClientController.php
@@ -86,9 +86,10 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
     │   ├── login/page.tsx               # Includes "Forgot your password?" link
     │   ├── forgot-password/page.tsx     # Email input → POST /api/auth/forgot-password
     │   ├── reset-password/page.tsx      # Token+email from URL → POST /api/auth/reset-password
+    │   ├── profile/page.tsx             # Change password form (any authenticated user); PUT /api/auth/password
     │   ├── dashboard/
     │   │   ├── layout.tsx               # Max-width container, white bg, no sidebar
-    │   │   └── page.tsx                 # Full reporting dashboard — summary, pacing, device/site/creative breakdowns
+    │   │   └── page.tsx                 # Full reporting dashboard — summary, pacing (separate fetch), device/site/creative breakdowns; user dropdown in header
     │   └── admin/
     │       ├── layout.tsx               # Sidebar nav + top bar, RouteGuard role=admin
     │       ├── page.tsx                 # Stats dashboard (4 stat cards)
@@ -115,7 +116,7 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
     │   └── dashboard/
     │       ├── StatCard.tsx             # label + value card
     │       ├── DateRangePicker.tsx      # Preset buttons + custom date inputs
-    │       ├── PacingBar.tsx            # Impression pacing progress bar with color coding
+    │       ├── PacingBar.tsx            # Impression pacing bar; uses dedicated /api/reports/pacing data (not date-range); info tooltip explains independence; label shows delivered%/expected%/as-of-today
     │       ├── CampaignSwitcher.tsx     # Horizontal pill tabs for multi_campaign clients; only renders when client_type=multi_campaign && campaigns>1
     │       ├── DeviceBreakdownChart.tsx # Recharts doughnut chart; colored by device type; custom tooltip; legend with % share
     │       ├── DomainBreakdownCards.tsx # Top-10 card grid (2-col desktop); impression share bar; "View All" modal with search
@@ -214,6 +215,7 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 |--------|------|-------------|
 | POST | `/api/auth/logout` | Revoke current token |
 | GET | `/api/auth/me` | Return authenticated user |
+| PUT | `/api/auth/password` | Change own password (`current_password`, `new_password`, `new_password_confirmation`) |
 | POST | `/api/admin/impersonate/stop` | Stop impersonation (accessible by client token) |
 
 ### Admin only (sanctum + role:admin)
@@ -247,6 +249,7 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 |--------|------|-------------|
 | GET | `/api/client/test` | Client access test |
 | GET | `/api/reports/campaigns` | List client's campaigns |
+| GET | `/api/reports/pacing` | Pacing data from campaign start to today — date-range independent. Returns `{ impressions, contracted, start_date, end_date, as_of }` or `{ available: false }` |
 | GET | `/api/reports/summary` | Summary report (impressions, clicks, CTR) |
 | GET | `/api/reports/device` | Device breakdown |
 | GET | `/api/reports/site` | Site breakdown |
@@ -257,6 +260,7 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 | POST | `/api/client/offers/{id}/dismiss` | Record offer dismissal for authenticated user |
 
 > Report endpoints accept query params: `date_from` (Y-m-d), `date_to` (Y-m-d), and optionally `campaign_id` (required for multi_campaign clients).
+> `/api/reports/pacing` only accepts optional `campaign_id` — it ignores date range and always uses campaign `start_date` → today.
 
 ---
 
