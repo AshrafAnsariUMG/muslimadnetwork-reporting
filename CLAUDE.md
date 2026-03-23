@@ -131,7 +131,8 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
     │       └── OffersStack.tsx          # Renders first banner + "+N more" expand pill; uses OfferBanner
     ├── components/
     │   └── ui/
-    │       └── Toast.tsx               # Toast component + useToast() hook (showToast, ToastContainer); auto-dismisses 2s
+    │       ├── Toast.tsx               # Toast component + useToast() hook (showToast, ToastContainer); auto-dismisses 2s
+    │       └── IslamicDivider.tsx      # Islamic geometric section divider; variant="full" (star medallion center) or "simple" (repeating band); gold #C9A84C; opacity 0.6
     └── .env
 ```
 
@@ -324,7 +325,10 @@ Admins can hide/show entire sections or individual table rows per client while i
 
 | Name | Hex | Usage |
 |------|-----|-------|
-| Brand Green | `#1a4a2e` | Header bar border, logo area only |
+| Brand Green | `#1a4a2e` | Campaign switcher active pill gradient, offer banner gradient start |
+| Gold | `#C9A84C` | Header border, stat card top border/icon gradient, pacing bar (on pace), section heading underlines/stars, campaign switcher active border, dividers, Bismillah text |
+| Gold Light | `#F0D080` | Stat card icon gradient end |
+| Gold Dark | `#A07830` | CSS variable only (--gold-dark) |
 | UI Blue (primary) | `#2563eb` | Buttons, active states, links, icon color |
 | Emerald (accent) | `#10b981` | Positive metrics, active badges, table bars |
 | Purple | `#8b5cf6` | CTR icon |
@@ -335,6 +339,8 @@ Admins can hide/show entire sections or individual table rows per client while i
 | Font | Inter (Google Fonts) | |
 
 > Dashboard UI was redesigned (modern rounded style): rounded-2xl cards, soft shadows, fade-in-up animations (staggered 50ms), pill preset buttons, animated pacing bar, rounded-full progress bars, hover row transitions.
+>
+> Session 8.2 — Islamic design elements added to client dashboard: gold CSS variables (--gold, --gold-light, --gold-dark), IslamicDivider SVG component (8-pointed star pattern), gold top border + gradient icon on StatCards, gold pacing bar (on-pace state), gold-bordered campaign switcher active pill, green-to-gold offer banner gradient, gold section heading underlines with star icons, Bismillah calligraphy in header, gold header border.
 
 ---
 
