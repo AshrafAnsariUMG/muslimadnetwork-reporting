@@ -48,6 +48,7 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 │   │   │   │       ├── CacheController.php       # Manual cache invalidation
 │   │   │   │       ├── OnboardingController.php  # Send onboarding email (resets password + emails credentials)
 │   │   │   │       └── VisibilityController.php  # Admin visibility CRUD (overview/show/upsert/reset)
+│   │   │   ├── AppIconController.php         # GET /api/app-icon?bundle_id= (auth:sanctum, any role); scrapes Play Store og:image; DB-cached 7 days
 │   │   │   └── Client/
 │   │   │       ├── VisibilityController.php      # Client reads own visibility settings
 │   │   │       └── OfferController.php           # GET /api/client/offers (manual + intelligent, non-dismissed); POST /api/client/offers/{id}/dismiss (handles "intelligent_*" IDs)
@@ -58,7 +59,8 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 │   │   │   ├── GmailMailerService.php        # Gmail API mailer (OAuth2 refresh token, bypasses Laravel mail)
 │   │   │   ├── ReportCacheService.php        # TTL caching layer over CM360Service + getCreativeMetadata() (24h TTL)
 │   │   │   ├── IntelligentOfferService.php   # Performance-triggered upsell offers; getOffersForCampaign(); 4 triggers
-│   │   │   └── CreativeEvaluationService.php # evaluate(creatives, campaignCtr, networkAvgCtr): adds performance_status, vs_campaign_avg, vs_network_avg, fatigue_risk, recommendation
+│   │   │   ├── CreativeEvaluationService.php # evaluate(creatives, campaignCtr, networkAvgCtr): adds performance_status, vs_campaign_avg, vs_network_avg, fatigue_risk, recommendation
+│   │   │   └── AppIconService.php            # Scrapes Play Store og:image for bundle ID; caches in app_icon_cache table (7-day TTL); singleton
 │   │   └── Models/
 │   │       ├── User.php
 │   │       ├── Client.php                   # + intelligent_offers_enabled (boolean, default false)
@@ -70,7 +72,8 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 │   │       ├── Offer.php                    # title, body, cta_label, cta_url, target, client_id, is_active, starts_at, ends_at
 │   │       ├── OfferDismissal.php           # user_id, offer_id, dismissed_at; unique(user_id, offer_id)
 │   │       ├── IntelligentOfferDismissal.php # user_id, trigger_name, dismissed_at; unique(user_id, trigger_name)
-│   │       └── ClientVisit.php              # user_id, client_id, visited_at; index(user_id, client_id, visited_at)
+│   │       ├── ClientVisit.php              # user_id, client_id, visited_at; index(user_id, client_id, visited_at)
+│   │       └── AppIconCache.php             # bundle_id (unique), icon_url, app_name, fetched_at, expires_at; 7-day TTL
 │   ├── config/
 │   │   ├── cors.php
 │   │   ├── sanctum.php
@@ -128,7 +131,7 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
     │       ├── CampaignSwitcher.tsx     # Horizontal pill tabs for multi_campaign clients; only renders when client_type=multi_campaign && campaigns>1
     │       ├── DeviceBreakdownChart.tsx # Recharts doughnut chart; colored by device type; custom tooltip; legend with % share
     │       ├── DomainBreakdownCards.tsx # Top-10 card grid (2-col desktop); impression share bar; "View All" modal with search
-    │       ├── AppBreakdownCards.tsx   # Same as DomainBreakdownCards; uses AppIcon (icon.horse + letter fallback); "View All" modal with search
+    │       ├── AppBreakdownCards.tsx   # Same as DomainBreakdownCards; uses AppIcon (fetches /api/app-icon server-side + letter avatar fallback); "View All" modal with search
     │       ├── CreativeBreakdownGrid.tsx  # Creative card grid (3-col desktop, 2 tablet, 1 mobile); iframe preview; click → CreativePreviewModal; top 6 + "Show All" modal
 │       ├── CreativePreviewModal.tsx   # Full-size iframe preview modal; ESC/backdrop closes; stats row (impressions/clicks/CTR/share); scales oversized creatives
     │       ├── ConversionCard.tsx       # Renders nothing if available=false
@@ -143,7 +146,7 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
     │       ├── Toast.tsx               # Toast component + useToast() hook (showToast, ToastContainer); auto-dismisses 2s
     │       ├── IslamicDivider.tsx      # Islamic geometric section divider; variant="full" (star medallion center) or "simple" (repeating band); gold #C9A84C; opacity 0.35
     │       ├── IslamicWatermark.tsx    # Fixed full-page SVG background watermark; 8-pointed star tile pattern; opacity 0.025; color #1a4a2e; z-index 0; pointer-events none
-    │       └── AppIcon.tsx             # App icon component; loads icon.horse/{appId} image; falls back to colored letter avatar; used in AppBreakdownCards
+    │       └── AppIcon.tsx             # App icon component; fetches /api/app-icon (server-side Play Store scrape, 7-day cache); falls back to gradient letter avatar; used in AppBreakdownCards
     └── .env
 ```
 
@@ -235,6 +238,7 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 | GET | `/api/auth/me` | Return authenticated user |
 | PUT | `/api/auth/password` | Change own password (`current_password`, `new_password`, `new_password_confirmation`) |
 | POST | `/api/admin/impersonate/stop` | Stop impersonation (accessible by client token) |
+| GET | `/api/app-icon` | Fetch Play Store icon for app bundle ID (`?bundle_id=`); returns `{bundle_id, icon_url, app_name}`; 7-day DB cache; `Cache-Control: public, max-age=604800` |
 
 ### Admin only (sanctum + role:admin)
 | Method | Path | Description |
@@ -364,7 +368,7 @@ Admins can hide/show entire sections or individual table rows per client while i
 >
 > Session 8.5.1 — Dashboard UI fixes: (1) Removed "Download Report" PDF button and related state/handler from dashboard/page.tsx. (2) Redesigned CampaignHealthScore as a stat card matching StatCard style — gold icon bg, heart-pulse icon, score/100 value, label badge, info tooltip, visibility toggle props. (3) Added MuslimReach stat card (value = impressions ÷ 5, mosque icon, info tooltip). (4) Per-card visibility toggles on all 6 stat cards: stat_impressions, stat_clicks, stat_ctr, stat_muslimreach, stat_health, stat_conversions — eye icon top-right of each card when impersonating; hidden+impersonating = 0.3 opacity; hidden+not impersonating = null. Summary grid changed to grid-cols-1 sm:grid-cols-2 lg:grid-cols-3. StatCard gains isImpersonating, isHidden, onVisibilityToggle, infoTooltip props. CampaignHealthScore moved into the summary grid (no longer a separate section below).
 >
-> Session 8.6 — App icons in breakdown cards: Added `appId` dimension to CM360 site report (buildSiteReport). normalizeSiteBreakdown now extracts app_id per row (null if "(not set)"), stored in app bucket and included in apps[] output. AppRow interface gains app_id: string|null. New AppIcon.tsx component: loads icon.horse/{appId}, falls back to colored letter avatar on error or null appId. AppBreakdownCards uses AppIcon replacing the letter avatar. Site cache cleared after change.
+> Session 8.6 — App icons in breakdown cards: Added `appId` dimension to CM360 site report (buildSiteReport). normalizeSiteBreakdown now extracts app_id per row (null if "(not set)"), stored in app bucket and included in apps[] output. AppRow interface gains app_id: string|null. New AppIcon.tsx component: fetches /api/app-icon (server-side Play Store og:image scrape) with gradient letter avatar fallback. AppBreakdownCards uses AppIcon replacing the letter avatar. New backend: AppIconService (scrapes og:image+og:title from Play Store), AppIconCache model+migration (bundle_id unique, 7-day TTL), AppIconController (GET /api/app-icon, auth:sanctum, Cache-Control 7d), singleton in AppServiceProvider.
 >
 > Session 8.2.1 — Islamic design refinement: (1) Gold reduced to borders only — StatCard uses 4-sided gold border (1px solid #C9A84C), icon backgrounds revert to colored (blue/emerald/purple), hover is now translateY(-3px) + shadow instead of gold glow. (2) PacingBar "on pace" badge: white bg + gold border + gold text; bar fill changed from gold to green #10b981. (3) CampaignSwitcher active pill: removed gold border, uses inset box-shadow for subtle gold left accent; inactive pills hover adds gold border + scale(1.02). (4) OfferBanner: solid dark green #1a4a2e bg + 2px gold border; CTA button white bg with dark green text + gold border. (5) Header gold border opacity reduced to 0.4. (6) "Campaign Performance" heading: removed gradient text, plain dark. (7) IslamicDivider opacity 0.6→0.35, stroke-width 0.7→0.5. (8) IslamicWatermark SVG component created — fixed full-page 8-pointed star geometric tile pattern, opacity 0.025, z-index 0, color #1a4a2e; added to dashboard/layout.tsx. (9) Domain/App breakdown cards: added 1px #e5e7eb border, hover gets gold border + translateY(-2px). (10) Creative cards: added 1px #e5e7eb border, hover gets gold border + translateY(-3px). (11) SectionCard: hover increases box-shadow.
 

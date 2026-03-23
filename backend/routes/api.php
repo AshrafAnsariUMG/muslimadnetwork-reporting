@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\Admin\OnboardingController;
 use App\Http\Controllers\Api\Admin\StatsController;
 use App\Http\Controllers\Api\Admin\UserController;
 use App\Http\Controllers\Api\Admin\VisibilityController as AdminVisibilityController;
+use App\Http\Controllers\Api\AppIconController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\Client\VisibilityController as ClientVisibilityController;
 use App\Http\Controllers\Api\PasswordResetController;
@@ -35,6 +36,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Impersonation stop — accessible by impersonated client user
     Route::post('/admin/impersonate/stop', [ImpersonationController::class, 'stop']);
+
+    // App icon lookup (any authenticated user)
+    Route::get('/app-icon', [AppIconController::class, 'show']);
 });
 
 // Admin only routes

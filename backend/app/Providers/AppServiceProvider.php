@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Services\AppIconService;
 use App\Services\CM360Service;
 use App\Services\GmailMailerService;
 use App\Services\ReportCacheService;
@@ -22,6 +23,8 @@ class AppServiceProvider extends ServiceProvider
             ReportCacheService::class,
             fn ($app) => new ReportCacheService($app->make(CM360Service::class))
         );
+
+        $this->app->singleton(AppIconService::class, fn () => new AppIconService());
     }
 
     /**
