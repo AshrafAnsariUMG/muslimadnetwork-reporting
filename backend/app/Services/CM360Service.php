@@ -112,7 +112,7 @@ class CM360Service
                     'type'        => (string) $creative->getType(),
                     'width'       => $size ? (int) $size->getWidth() : 0,
                     'height'      => $size ? (int) $size->getHeight() : 0,
-                    'preview_url' => $creative->getPreviewUrl() ?: null,
+                    'preview_url' => $this->resolvePreviewUrl($creative),
                 ];
             }
 
@@ -134,6 +134,30 @@ class CM360Service
             }
             return [];
         }
+    }
+
+    /**
+     * Construct a publicly accessible preview URL from the creative's primary asset.
+     * For HTML_IMAGE assets (DISPLAY creatives), CM360 serves them from s0.2mdn.net.
+     */
+    private function resolvePreviewUrl(\Google\Service\Dfareporting\Creative $creative): ?string
+    {
+        foreach ($creative->getCreativeAssets() ?? [] as $asset) {
+            if ($asset->getRole() !== 'PRIMARY') {
+                continue;
+            }
+            $identifier = $asset->getAssetIdentifier();
+            if (!$identifier) {
+                continue;
+            }
+            $assetName = $identifier->getName();
+            $assetType = $identifier->getType();
+
+            if ($assetName && $assetType === 'HTML_IMAGE') {
+                return 'https://s0.2mdn.net/' . $this->advertiserId . '/' . rawurlencode($assetName);
+            }
+        }
+        return null;
     }
 
     private function buildSummaryReport(Campaign $campaign, string $dateFrom, string $dateTo): Report
