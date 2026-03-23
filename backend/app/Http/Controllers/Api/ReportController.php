@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Campaign;
 use App\Models\ReportCache;
+use App\Services\CreativeEvaluationService;
 use App\Services\ReportCacheService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -13,7 +14,10 @@ use Illuminate\Support\Facades\Log;
 
 class ReportController extends Controller
 {
-    public function __construct(private ReportCacheService $cache) {}
+    public function __construct(
+        private ReportCacheService $cache,
+        private CreativeEvaluationService $evaluation,
+    ) {}
 
     public function summary(Request $request): JsonResponse
     {
@@ -87,7 +91,22 @@ class ReportController extends Controller
     public function creative(Request $request): JsonResponse
     {
         [$campaign, $dateFrom, $dateTo] = $this->resolveParams($request);
-        return response()->json($this->cache->get($campaign, $dateFrom, $dateTo, 'creative'));
+        $creatives = $this->cache->get($campaign, $dateFrom, $dateTo, 'creative');
+
+        // Get campaign CTR from cached summary (same date range) — no fresh CM360 call
+        $summaryCache = ReportCache::where('campaign_id', $campaign->id)
+            ->where('date_from', $dateFrom)
+            ->where('date_to', $dateTo)
+            ->where('report_type', 'summary')
+            ->latest('fetched_at')
+            ->first();
+
+        $campaignCtr   = (float) ($summaryCache?->payload['ctr'] ?? 0);
+        $networkAvgCtr = (float) config('reporting.network_avg_ctr', 0.05);
+
+        $enhanced = $this->evaluation->evaluate($creatives, $campaignCtr, $networkAvgCtr);
+
+        return response()->json($enhanced);
     }
 
     public function conversion(Request $request): JsonResponse

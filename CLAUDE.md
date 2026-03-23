@@ -33,7 +33,7 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 │   │   │   ├── Controllers/Api/
 │   │   │   │   ├── AuthController.php
 │   │   │   │   ├── UmmahPassController.php
-│   │   │   │   ├── ReportController.php          # Client report endpoints + pacing() + creativesMetadata()
+│   │   │   │   ├── ReportController.php          # Client report endpoints + pacing() + creativesMetadata(); creative() injects CreativeEvaluationService
 │   │   │   │   ├── Reports/
 │   │   │   │   │   └── CampaignSummaryController.php  # GET /api/reports/campaign-summary/pdf (client+admin)
 │   │   │   │   ├── PasswordResetController.php   # forgot-password + reset-password
@@ -57,7 +57,8 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 │   │   │   ├── CM360Service.php              # Google CM360 API integration + fetchCreativeMetadata() (Creatives API, not report)
 │   │   │   ├── GmailMailerService.php        # Gmail API mailer (OAuth2 refresh token, bypasses Laravel mail)
 │   │   │   ├── ReportCacheService.php        # TTL caching layer over CM360Service + getCreativeMetadata() (24h TTL)
-│   │   │   └── IntelligentOfferService.php   # Performance-triggered upsell offers; getOffersForCampaign(); 4 triggers
+│   │   │   ├── IntelligentOfferService.php   # Performance-triggered upsell offers; getOffersForCampaign(); 4 triggers
+│   │   │   └── CreativeEvaluationService.php # evaluate(creatives, campaignCtr, networkAvgCtr): adds performance_status, vs_campaign_avg, vs_network_avg, fatigue_risk, recommendation
 │   │   └── Models/
 │   │       ├── User.php
 │   │       ├── Client.php                   # + intelligent_offers_enabled (boolean, default false)
@@ -356,6 +357,8 @@ Admins can hide/show entire sections or individual table rows per client while i
 > Session 8.3 — Campaign intelligence: client_visits table + AuthController me() records visits with 1h debounce + returns last_visited_at. Summary endpoint adds network_avg_ctr, ctr_vs_benchmark, health_score, health_label. CampaignHealthScore, SinceLastVisit, BenchmarkBadge components. Top Performer badge on highest-CTR creative. StatCard accepts ctrVsBenchmark prop.
 >
 > Session 8.4 — Intelligent offers: intelligent_offers_enabled flag on clients (admin toggle in UI). IntelligentOfferService with 4 performance triggers (behind pace, ending soon, strong CTR, just started). Separate intelligent_offer_dismissals table. PDF report: barryvdh/laravel-dompdf, CampaignSummaryController, 6-page Blade PDF (cover, executive summary, device, domains/apps, creatives, closing). "Download Report" gold button in dashboard header.
+>
+> Session 8.5 — Creative evaluation: CreativeEvaluationService injected into ReportController::creative(). Adds performance_status (top_performer/strong/average/underperforming/insufficient_data), vs_campaign_avg %, vs_network_avg %, fatigue_risk bool, recommendation string. CreativeBreakdownGrid: status badges (⭐💪⚠️😴), recommendation tooltip (ℹ️), vs-campaign-avg line below bar, InsightsSummary filter row (clickable counts, clear filter). CreativePreviewModal: evaluation section with status badge, benchmark pills, fatigue warning box, recommendation box.
 
 ---
 
