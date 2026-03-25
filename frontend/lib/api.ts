@@ -23,10 +23,20 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401 && typeof window !== 'undefined') {
-      localStorage.removeItem('auth_token')
-      localStorage.removeItem('admin_token')
-      localStorage.removeItem('impersonation_token')
-      window.location.href = '/login?expired=1'
+      const requestUrl = error.config?.url || ''
+      const isAuthEndpoint =
+        requestUrl.includes('/auth/login') ||
+        requestUrl.includes('/auth/logout') ||
+        requestUrl.includes('/auth/forgot-password') ||
+        requestUrl.includes('/auth/reset-password') ||
+        requestUrl.includes('/auth/ummahpass')
+
+      if (!isAuthEndpoint) {
+        localStorage.removeItem('auth_token')
+        localStorage.removeItem('admin_token')
+        localStorage.removeItem('impersonation_token')
+        window.location.href = '/login?expired=1'
+      }
     }
     return Promise.reject(error)
   }
