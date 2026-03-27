@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\Admin\AuditLogController;
+use App\Http\Controllers\Api\Admin\DisplayNameController;
 use App\Http\Controllers\Api\Admin\OfferAdminController;
 use App\Http\Controllers\Api\Client\OfferController;
 use App\Http\Controllers\Api\Admin\CacheController;
@@ -89,6 +90,11 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::get('/admin/visibility/{client_id}', [AdminVisibilityController::class, 'show']);
     Route::post('/admin/visibility/{client_id}', [AdminVisibilityController::class, 'upsert']);
     Route::delete('/admin/visibility/{client_id}/reset', [AdminVisibilityController::class, 'reset']);
+
+    // Display names (rename domains/apps)
+    Route::get('/admin/display-names', [DisplayNameController::class, 'index']);
+    Route::post('/admin/display-names', [DisplayNameController::class, 'store']);
+    Route::delete('/admin/display-names/{id}', [DisplayNameController::class, 'destroy']);
 
     // CM360 test
     Route::get('/admin/cm360-test', function () {

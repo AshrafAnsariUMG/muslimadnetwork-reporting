@@ -6,8 +6,6 @@ export interface SummaryReport {
   date_to: string
   network_avg_ctr?: number
   ctr_vs_benchmark?: number
-  health_score?: number
-  health_label?: string
 }
 
 export interface DeviceRow {

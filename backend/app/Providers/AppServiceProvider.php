@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Services\AppIconService;
 use App\Services\CM360Service;
+use App\Services\DisplayNameService;
 use App\Services\GmailMailerService;
 use App\Services\ReportCacheService;
 use Illuminate\Support\ServiceProvider;
@@ -25,6 +26,8 @@ class AppServiceProvider extends ServiceProvider
         );
 
         $this->app->singleton(AppIconService::class, fn () => new AppIconService());
+
+        $this->app->singleton(DisplayNameService::class, fn () => new DisplayNameService());
     }
 
     /**

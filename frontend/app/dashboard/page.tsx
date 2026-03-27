@@ -26,7 +26,6 @@ import DeviceBreakdownChart from '@/components/dashboard/DeviceBreakdownChart'
 import DomainBreakdownCards from '@/components/dashboard/DomainBreakdownCards'
 import AppBreakdownCards from '@/components/dashboard/AppBreakdownCards'
 import CreativeBreakdownGrid from '@/components/dashboard/CreativeBreakdownGrid'
-import CampaignHealthScore from '@/components/dashboard/CampaignHealthScore'
 import { useCreativeMetadata } from '@/hooks/useCreativeMetadata'
 import IslamicDivider from '@/components/ui/IslamicDivider'
 import VisibilityToggle from '@/components/dashboard/VisibilityToggle'
@@ -395,13 +394,13 @@ function DashboardContent() {
             )}
             <div style={{ opacity: isHidden('summary') ? 0.4 : 1, transition: 'opacity 200ms ease' }}>
               {summary.isLoading ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {[...Array(6)].map((_, i) => <SkeletonBlock key={i} height="h-28" />)}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {[...Array(4)].map((_, i) => <SkeletonBlock key={i} height="h-28" />)}
                 </div>
               ) : summary.error ? (
                 <ErrorBlock message="Summary data temporarily unavailable — please refresh." />
               ) : summary.data ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <StatCard
                     label="Impressions"
                     value={formatNumber(summary.data.impressions)}
@@ -440,15 +439,6 @@ function DashboardContent() {
                     isHidden={isHidden('stat_muslimreach')}
                     onVisibilityToggle={() => toggle('stat_muslimreach', 'section', null, !isHidden('stat_muslimreach'))}
                   />
-                  {summary.data.health_score !== undefined && summary.data.health_label && (
-                    <CampaignHealthScore
-                      score={summary.data.health_score}
-                      label={summary.data.health_label}
-                      isImpersonating={isImpersonating}
-                      isHidden={isHidden('stat_health')}
-                      onVisibilityToggle={() => toggle('stat_health', 'section', null, !isHidden('stat_health'))}
-                    />
-                  )}
                   {conversionEnabled && (
                     <StatCard
                       label="Total Conversions"

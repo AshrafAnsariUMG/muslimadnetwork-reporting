@@ -323,6 +323,45 @@ class CM360Service
             }
         }
 
+        // ── muslimadnetwork.com merge ─────────────────────────────────────────
+        // Find muslimadnetwork.com in domains and merge its impressions/clicks
+        // into the Prayer Times app entry, then remove it from domains.
+        $manDomainIdx = null;
+        foreach ($domains as $i => $d) {
+            if (strtolower($d['domain']) === 'muslimadnetwork.com') {
+                $manDomainIdx = $i;
+                break;
+            }
+        }
+
+        if ($manDomainIdx !== null) {
+            $manImpressions = $domains[$manDomainIdx]['impressions'];
+            $manClicks      = $domains[$manDomainIdx]['clicks'];
+
+            // Find Prayer Times app by case-insensitive partial name match
+            $prayerIdx = null;
+            foreach ($apps as $j => $app) {
+                if (stripos($app['app'], 'prayer') !== false || stripos($app['app'], 'prayer times') !== false) {
+                    $prayerIdx = $j;
+                    break;
+                }
+            }
+
+            if ($prayerIdx !== null) {
+                $apps[$prayerIdx]['impressions'] += $manImpressions;
+                $apps[$prayerIdx]['clicks']      += $manClicks;
+                $imp = $apps[$prayerIdx]['impressions'];
+                $clk = $apps[$prayerIdx]['clicks'];
+                $apps[$prayerIdx]['ctr'] = $imp > 0 ? round($clk / $imp * 100, 4) : 0.0;
+            }
+
+            // Always remove muslimadnetwork.com from domains
+            array_splice($domains, $manDomainIdx, 1);
+
+            // Re-sort apps by impressions descending
+            usort($apps, fn ($a, $b) => $b['impressions'] <=> $a['impressions']);
+        }
+
         return ['domains' => $domains, 'apps' => $apps];
     }
 

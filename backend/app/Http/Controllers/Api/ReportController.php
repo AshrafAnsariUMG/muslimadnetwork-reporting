@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Campaign;
 use App\Models\ReportCache;
 use App\Services\CreativeEvaluationService;
+use App\Services\DisplayNameService;
 use App\Services\ReportCacheService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -17,6 +18,7 @@ class ReportController extends Controller
     public function __construct(
         private ReportCacheService $cache,
         private CreativeEvaluationService $evaluation,
+        private DisplayNameService $displayNames,
     ) {}
 
     public function summary(Request $request): JsonResponse
@@ -30,49 +32,9 @@ class ReportController extends Controller
             ? round((($ctr - $networkAvgCtr) / $networkAvgCtr) * 100, 1)
             : 0.0;
 
-        // Pacing score — check existing cache for campaign full range; no fresh CM360 fetch
-        $pacingScore = 0;
-        if ((int) $campaign->contracted_impressions > 0) {
-            $campaignStart = Carbon::parse($campaign->start_date)->format('Y-m-d');
-            $today = Carbon::today()->format('Y-m-d');
-            $pacingCache = ReportCache::where('campaign_id', $campaign->id)
-                ->where('date_from', $campaignStart)
-                ->where('date_to', $today)
-                ->where('report_type', 'summary')
-                ->where('expires_at', '>', now())
-                ->first();
-
-            if ($pacingCache) {
-                $delivered = (int) ($pacingCache->payload['impressions'] ?? 0);
-                $contracted = (int) $campaign->contracted_impressions;
-                $start = Carbon::parse($campaignStart)->timestamp;
-                $end = Carbon::parse($campaign->end_date)->timestamp;
-                $totalDays = ($end - $start) / 86400;
-                $elapsedDays = min(max((time() - $start) / 86400, 0), $totalDays);
-                $expectedPct = $totalDays > 0 ? ($elapsedDays / $totalDays) * 100 : 0;
-                $deliveredPct = $contracted > 0 ? ($delivered / $contracted) * 100 : 0;
-                $pacingRatio = $expectedPct > 0 ? ($deliveredPct / $expectedPct) * 100 : 100;
-                $pacingScore = (int) min(25, max(0, ($pacingRatio / 100) * 25));
-            }
-        }
-
-        // CTR score: 0–25 pts; reaching 2× network avg = full 25 pts
-        $ctrScore = (int) min(25, max(0, $networkAvgCtr > 0 ? ($ctr / $networkAvgCtr) * 12.5 : 0));
-
-        $healthScore = 50 + $pacingScore + $ctrScore;
-
-        $healthLabel = match (true) {
-            $healthScore >= 80 => 'Excellent',
-            $healthScore >= 60 => 'Good',
-            $healthScore >= 40 => 'On Track',
-            default             => 'Needs Attention',
-        };
-
         return response()->json(array_merge($data, [
             'network_avg_ctr'  => $networkAvgCtr,
             'ctr_vs_benchmark' => $ctrVsBenchmark,
-            'health_score'     => $healthScore,
-            'health_label'     => $healthLabel,
         ]));
     }
 
@@ -85,7 +47,13 @@ class ReportController extends Controller
     public function site(Request $request): JsonResponse
     {
         [$campaign, $dateFrom, $dateTo] = $this->resolveParams($request);
-        return response()->json($this->cache->get($campaign, $dateFrom, $dateTo, 'site'));
+        $data = $this->cache->get($campaign, $dateFrom, $dateTo, 'site');
+        $clientId = $request->user()->client?->id;
+
+        $data['domains'] = $this->displayNames->applyToRows($data['domains'] ?? [], 'domain', 'domain', $clientId);
+        $data['apps']    = $this->displayNames->applyToRows($data['apps']    ?? [], 'app',    'app',    $clientId);
+
+        return response()->json($data);
     }
 
     public function creative(Request $request): JsonResponse

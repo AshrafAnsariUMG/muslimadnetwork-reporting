@@ -38,7 +38,6 @@ const STAT_CARDS: { key: string; label: string; description: string }[] = [
   { key: 'stat_clicks',      label: 'Clicks',          description: 'Total clicks on ads' },
   { key: 'stat_ctr',         label: 'CTR',             description: 'Click-through rate with benchmark comparison' },
   { key: 'stat_muslimreach', label: 'MuslimReach',     description: 'Estimated Muslims reached (impressions ÷ 5)' },
-  { key: 'stat_health',      label: 'Campaign Health', description: 'Overall campaign health score 0–100' },
   { key: 'stat_conversions', label: 'Conversions',     description: 'Total conversions (only shown if tracking enabled)' },
 ]
 
