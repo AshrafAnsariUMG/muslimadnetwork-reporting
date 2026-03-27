@@ -537,7 +537,7 @@ class CM360Service
         $httpClient = $this->client->authorize();
 
         $url = sprintf(
-            'https://www.googleapis.com/dfareporting/v4/userprofiles/%s/reports/%s/files/%s?alt=media',
+            'https://dfareporting.googleapis.com/dfareporting/v5/userprofiles/%s/reports/%s/files/%s?alt=media',
             $this->profileId,
             $reportId,
             $fileId
