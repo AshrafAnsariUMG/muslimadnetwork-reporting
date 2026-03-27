@@ -21,15 +21,23 @@ class MasjidConnectController extends Controller
             return response()->json(['enabled' => false, 'masjids' => []]);
         }
 
-        $masjids = MasjidConnect::where('client_id', $client->id)
+        $query = MasjidConnect::where('client_id', $client->id)
             ->where('is_active', true)
-            ->orderBy('sort_order')
-            ->get()
-            ->map(function ($record) {
-                $data = $record->toArray();
-                $data['screen_photo_url'] = asset('storage/' . $record->screen_photo_path);
-                return $data;
+            ->orderBy('sort_order');
+
+        if ($request->filled('campaign_id')) {
+            $campaignId = (int) $request->campaign_id;
+            $query->where(function ($q) use ($campaignId) {
+                $q->where('campaign_id', $campaignId)
+                  ->orWhereNull('campaign_id');
             });
+        }
+
+        $masjids = $query->get()->map(function ($record) {
+            $data = $record->toArray();
+            $data['screen_photo_url'] = asset('storage/' . $record->screen_photo_path);
+            return $data;
+        });
 
         return response()->json([
             'enabled' => true,

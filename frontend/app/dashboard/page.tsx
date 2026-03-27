@@ -24,6 +24,9 @@ import OffersStack from '@/components/dashboard/OffersStack'
 import MasjidConnectSection from '@/components/dashboard/MasjidConnectSection'
 import { useOffers } from '@/hooks/useOffers'
 import { useMasjidConnect } from '@/hooks/useMasjidConnect'
+import { Skeleton } from '@/components/ui/Skeleton'
+import StatCardSkeleton from '@/components/ui/StatCardSkeleton'
+import { MosqueIcon } from '@/components/ui/IslamicIcons'
 import api from '@/lib/api'
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
@@ -57,14 +60,7 @@ const CheckCircleIcon = () => (
   </svg>
 )
 
-const MosqueIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 2C9 2 7 4 7 6c0 1.5.8 2.8 2 3.5V11H5l-2 2h18l-2-2h-4V9.5c1.2-.7 2-2 2-3.5 0-2-2-4-5-4z" />
-    <rect x="3" y="13" width="18" height="9" rx="1" />
-    <line x1="12" y1="13" x2="12" y2="22" />
-    <line x1="3" y1="18" x2="21" y2="18" />
-  </svg>
-)
+const MosqueStatIcon = () => <MosqueIcon size={20} color="#059669" />
 
 // ─── Status badge config ──────────────────────────────────────────────────────
 
@@ -211,7 +207,7 @@ function DashboardContent() {
   // Visibility
   const { isHidden, toggle } = useVisibility(client?.id)
   const { offers, dismissOffer } = useOffers()
-  const { data: masjidData, isLoading: masjidLoading } = useMasjidConnect()
+  const { data: masjidData, isLoading: masjidLoading } = useMasjidConnect(campaignId)
 
   const handleDateChange = (from: string, to: string) => {
     setDateFrom(from)
@@ -378,7 +374,7 @@ function DashboardContent() {
             <div style={{ opacity: isHidden('summary') ? 0.4 : 1, transition: 'opacity 200ms ease' }}>
               {summary.isLoading ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {[...Array(4)].map((_, i) => <SkeletonBlock key={i} height="h-28" />)}
+                  {[...Array(4)].map((_, i) => <StatCardSkeleton key={i} />)}
                 </div>
               ) : summary.error ? (
                 <ErrorBlock message="Summary data temporarily unavailable — please refresh." />
@@ -415,7 +411,7 @@ function DashboardContent() {
                   <StatCard
                     label="MuslimReach"
                     value={formatNumber(Math.round(summary.data.impressions / 5))}
-                    icon={<MosqueIcon />}
+                    icon={<MosqueStatIcon />}
                     iconBg="#d1fae5"
                     infoTooltip="Approximate number of Muslims reached based on our network audience data."
                     isImpersonating={isImpersonating}
@@ -477,7 +473,25 @@ function DashboardContent() {
               />
             </div>
             {device.isLoading ? (
-              <div className="px-5 pb-5"><SkeletonBlock height="h-32" /></div>
+              <div className="px-5 pb-5">
+                <div className="flex flex-col sm:flex-row items-center gap-6">
+                  {/* Donut ring placeholder */}
+                  <div className="flex-shrink-0 relative" style={{ width: 200, height: 200 }}>
+                    <Skeleton className="absolute inset-0 rounded-full" />
+                    <div className="absolute rounded-full bg-white" style={{ inset: 45 }} />
+                  </div>
+                  {/* Legend rows */}
+                  <div className="flex-1 w-full" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {[...Array(4)].map((_, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <Skeleton style={{ width: 12, height: 12, borderRadius: '50%', flexShrink: 0 }} />
+                        <Skeleton style={{ height: 11, flex: 1, borderRadius: 6 }} />
+                        <Skeleton style={{ height: 11, width: 56, borderRadius: 6, flexShrink: 0 }} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             ) : device.error ? (
               <div className="px-5 pb-5"><ErrorBlock message="Device data temporarily unavailable — please refresh." /></div>
             ) : device.data ? (
@@ -509,7 +523,23 @@ function DashboardContent() {
               />
             </div>
             {site.isLoading ? (
-              <div className="px-5 pb-5"><SkeletonBlock height="h-48" /></div>
+              <div className="px-5 pb-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="rounded-xl p-4" style={{ border: '1px solid #f1f5f9' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <Skeleton style={{ width: 36, height: 36, borderRadius: 8, flexShrink: 0 }} />
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                          <Skeleton style={{ height: 12, borderRadius: 6, width: '70%' }} />
+                          <Skeleton style={{ height: 10, borderRadius: 6, width: '45%' }} />
+                        </div>
+                        <Skeleton style={{ height: 12, borderRadius: 6, width: 44, flexShrink: 0 }} />
+                      </div>
+                      <Skeleton style={{ height: 6, borderRadius: 3, marginTop: 12 }} />
+                    </div>
+                  ))}
+                </div>
+              </div>
             ) : site.error ? (
               <div className="px-5 pb-5"><ErrorBlock message="Domain data temporarily unavailable — please refresh." /></div>
             ) : site.data ? (
@@ -542,7 +572,23 @@ function DashboardContent() {
               />
             </div>
             {site.isLoading ? (
-              <div className="px-5 pb-5"><SkeletonBlock height="h-48" /></div>
+              <div className="px-5 pb-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="rounded-xl p-4" style={{ border: '1px solid #f1f5f9' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <Skeleton style={{ width: 36, height: 36, borderRadius: 8, flexShrink: 0 }} />
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                          <Skeleton style={{ height: 12, borderRadius: 6, width: '70%' }} />
+                          <Skeleton style={{ height: 10, borderRadius: 6, width: '45%' }} />
+                        </div>
+                        <Skeleton style={{ height: 12, borderRadius: 6, width: 44, flexShrink: 0 }} />
+                      </div>
+                      <Skeleton style={{ height: 6, borderRadius: 3, marginTop: 12 }} />
+                    </div>
+                  ))}
+                </div>
+              </div>
             ) : site.error ? (
               <div className="px-5 pb-5"><ErrorBlock message="App data temporarily unavailable — please refresh." /></div>
             ) : site.data ? (
@@ -578,12 +624,12 @@ function DashboardContent() {
               <div className="px-5 pb-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {[...Array(6)].map((_, i) => (
-                    <div key={i} className="rounded-2xl overflow-hidden" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-                      <div className="animate-pulse" style={{ height: 160, backgroundColor: '#f1f5f9' }} />
-                      <div className="p-4 space-y-2">
-                        <div className="h-4 bg-gray-100 animate-pulse rounded-lg w-3/4" />
-                        <div className="h-1.5 bg-gray-100 animate-pulse rounded-full w-full" />
-                        <div className="h-3 bg-gray-100 animate-pulse rounded-lg w-2/3" />
+                    <div key={i} className="rounded-2xl overflow-hidden" style={{ border: '1px solid #e5e7eb', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                      <Skeleton style={{ height: 160 }} />
+                      <div className="p-4" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <Skeleton style={{ height: 14, borderRadius: 6, width: '75%' }} />
+                        <Skeleton style={{ height: 6, borderRadius: 3 }} />
+                        <Skeleton style={{ height: 12, borderRadius: 6, width: '55%' }} />
                       </div>
                     </div>
                   ))}

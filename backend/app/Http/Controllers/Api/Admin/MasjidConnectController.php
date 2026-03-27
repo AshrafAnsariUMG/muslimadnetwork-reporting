@@ -15,17 +15,25 @@ class MasjidConnectController extends Controller
     {
         $data = $record->toArray();
         $data['screen_photo_url'] = asset('storage/' . $record->screen_photo_path);
+        // Include campaign name if relation loaded
+        if ($record->relationLoaded('campaign') && $record->campaign) {
+            $data['campaign_name'] = $record->campaign->name;
+        }
         return $data;
     }
 
-    public function index(int $clientId): JsonResponse
+    public function index(Request $request, int $clientId): JsonResponse
     {
-        $records = MasjidConnect::where('client_id', $clientId)
-            ->orderBy('sort_order')
-            ->get();
+        $query = MasjidConnect::with('campaign')
+            ->where('client_id', $clientId)
+            ->orderBy('sort_order');
+
+        if ($request->filled('campaign_id')) {
+            $query->where('campaign_id', $request->campaign_id);
+        }
 
         return response()->json(
-            $records->map(fn ($r) => $this->withPhotoUrl($r))
+            $query->get()->map(fn ($r) => $this->withPhotoUrl($r))
         );
     }
 
@@ -37,18 +45,30 @@ class MasjidConnectController extends Controller
             'country'      => ['nullable', 'string', 'max:255'],
             'screen_photo' => ['required', 'image', 'max:5120'],
             'sort_order'   => ['nullable', 'integer'],
+            'campaign_id'  => [
+                'nullable',
+                'integer',
+                function ($attribute, $value, $fail) use ($clientId) {
+                    if ($value && !\App\Models\Campaign::where('id', $value)->where('client_id', $clientId)->exists()) {
+                        $fail('The selected campaign does not belong to this client.');
+                    }
+                },
+            ],
         ]);
 
         $path = $request->file('screen_photo')->store('masjid-screens', 'public');
 
         $record = MasjidConnect::create([
             'client_id'         => $clientId,
+            'campaign_id'       => $request->input('campaign_id') ?: null,
             'masjid_name'       => $request->masjid_name,
             'city'              => $request->city,
             'country'           => $request->input('country', 'United States'),
             'screen_photo_path' => $path,
             'sort_order'        => $request->input('sort_order', 0),
         ]);
+
+        $record->load('campaign');
 
         return response()->json($this->withPhotoUrl($record), 201);
     }
@@ -63,6 +83,15 @@ class MasjidConnectController extends Controller
             'country'      => ['nullable', 'string', 'max:255'],
             'screen_photo' => ['nullable', 'image', 'max:5120'],
             'sort_order'   => ['nullable', 'integer'],
+            'campaign_id'  => [
+                'nullable',
+                'integer',
+                function ($attribute, $value, $fail) use ($clientId) {
+                    if ($value && !\App\Models\Campaign::where('id', $value)->where('client_id', $clientId)->exists()) {
+                        $fail('The selected campaign does not belong to this client.');
+                    }
+                },
+            ],
         ]);
 
         if ($request->hasFile('screen_photo')) {
@@ -75,8 +104,10 @@ class MasjidConnectController extends Controller
             'city'        => $request->input('city', $record->city),
             'country'     => $request->input('country', $record->country),
             'sort_order'  => $request->input('sort_order', $record->sort_order),
+            'campaign_id' => $request->has('campaign_id') ? ($request->input('campaign_id') ?: null) : $record->campaign_id,
         ]);
         $record->save();
+        $record->load('campaign');
 
         return response()->json($this->withPhotoUrl($record));
     }

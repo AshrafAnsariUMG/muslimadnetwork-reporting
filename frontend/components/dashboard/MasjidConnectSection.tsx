@@ -3,17 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { MasjidConnectData, MasjidEntry } from '@/types/reports'
-
-// ─── Icons ───────────────────────────────────────────────────────────────────
-
-const MosqueIcon = ({ size = 24, color = 'currentColor' }: { size?: number; color?: string }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 2C9 2 7 4 7 6c0 1.5.8 2.8 2 3.5V11H5l-2 2h18l-2-2h-4V9.5c1.2-.7 2-2 2-3.5 0-2-2-4-5-4z" />
-    <rect x="3" y="13" width="18" height="9" rx="1" />
-    <line x1="12" y1="13" x2="12" y2="22" />
-    <line x1="3" y1="18" x2="21" y2="18" />
-  </svg>
-)
+import { MosqueIcon } from '@/components/ui/IslamicIcons'
+import { Skeleton } from '@/components/ui/Skeleton'
 
 const ChevronLeftIcon = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -226,7 +217,17 @@ export default function MasjidConnectSection({ data, isLoading }: Props) {
 
   if (isLoading) {
     return (
-      <div className="rounded-2xl animate-pulse" style={{ height: 280, backgroundColor: '#e5e7eb' }} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="rounded-2xl overflow-hidden" style={{ border: '1px solid #e5e7eb', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+            <Skeleton style={{ height: 180 }} />
+            <div className="p-4" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <Skeleton style={{ height: 14, borderRadius: 6, width: '70%' }} />
+              <Skeleton style={{ height: 12, borderRadius: 6, width: '45%' }} />
+            </div>
+          </div>
+        ))}
+      </div>
     )
   }
 

@@ -3,21 +3,13 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import api from '@/lib/api'
+import { MosqueIcon } from '@/components/ui/IslamicIcons'
 
 interface ClientRow {
   id: number
   name: string
   masjids_count?: number
 }
-
-const MosqueIcon = () => (
-  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 2C9 2 7 4 7 6c0 1.5.8 2.8 2 3.5V11H5l-2 2h18l-2-2h-4V9.5c1.2-.7 2-2 2-3.5 0-2-2-4-5-4z" />
-    <rect x="3" y="13" width="18" height="9" rx="1" />
-    <line x1="12" y1="13" x2="12" y2="22" />
-    <line x1="3" y1="18" x2="21" y2="18" />
-  </svg>
-)
 
 export default function MasjidConnectOverviewPage() {
   const [clients, setClients] = useState<ClientRow[]>([])
@@ -36,7 +28,7 @@ export default function MasjidConnectOverviewPage() {
   return (
     <div>
       <div className="flex items-center gap-3 mb-6">
-        <MosqueIcon />
+        <MosqueIcon size={32} color="#C9A84C" />
         <div>
           <h1 className="text-lg font-bold text-gray-900">MasjidConnect</h1>
           <p className="text-xs text-[#64748b] mt-0.5">Manage masjid screen placements per client</p>
@@ -51,7 +43,7 @@ export default function MasjidConnectOverviewPage() {
           style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}
         >
           <div className="mb-4 opacity-40">
-            <MosqueIcon />
+            <MosqueIcon size={32} color="#C9A84C" />
           </div>
           <p className="text-sm text-[#64748b] font-medium">No clients have MasjidConnect enabled.</p>
           <p className="text-xs text-[#94a3b8] mt-1">Enable it per client on the Clients page.</p>

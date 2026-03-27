@@ -9,6 +9,7 @@ class MasjidConnect extends Model
 {
     protected $fillable = [
         'client_id',
+        'campaign_id',
         'masjid_name',
         'city',
         'country',
@@ -20,13 +21,19 @@ class MasjidConnect extends Model
     protected function casts(): array
     {
         return [
-            'is_active' => 'boolean',
-            'sort_order' => 'integer',
+            'is_active'   => 'boolean',
+            'sort_order'  => 'integer',
+            'campaign_id' => 'integer',
         ];
     }
 
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
+    }
+
+    public function campaign(): BelongsTo
+    {
+        return $this->belongsTo(Campaign::class);
     }
 }

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, FormEvent } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import api from '@/lib/api'
+import { MosqueIcon } from '@/components/ui/IslamicIcons'
 
 interface MasjidRecord {
   id: number
@@ -13,26 +14,38 @@ interface MasjidRecord {
   screen_photo_url: string
   sort_order: number
   is_active: boolean
+  campaign_id: number | null
+  campaign_name?: string
 }
 
-const MosqueIcon = ({ size = 40, color = '#C9A84C' }: { size?: number; color?: string }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 2C9 2 7 4 7 6c0 1.5.8 2.8 2 3.5V11H5l-2 2h18l-2-2h-4V9.5c1.2-.7 2-2 2-3.5 0-2-2-4-5-4z" />
-    <rect x="3" y="13" width="18" height="9" rx="1" />
-    <line x1="12" y1="13" x2="12" y2="22" />
-    <line x1="3" y1="18" x2="21" y2="18" />
-  </svg>
-)
+interface Campaign {
+  id: number
+  name: string
+}
+
+interface ClientDetail {
+  id: number
+  name: string
+  client_type: string
+}
 
 const inputCls = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100'
+const selectCls = inputCls
+
+// null = "All Campaigns" tab
+type TabKey = number | null
 
 export default function MasjidConnectClientPage() {
   const params = useParams()
   const clientId = params.clientId as string
 
-  const [masjids, setMasjids] = useState<MasjidRecord[]>([])
+  const [allMasjids, setAllMasjids] = useState<MasjidRecord[]>([])
   const [loading, setLoading] = useState(true)
-  const [clientName, setClientName] = useState('')
+  const [client, setClient] = useState<ClientDetail | null>(null)
+  const [campaigns, setCampaigns] = useState<Campaign[]>([])
+
+  // Tab state — null = "All Campaigns", number = specific campaign id
+  const [activeTab, setActiveTab] = useState<TabKey>(null)
 
   const [modalOpen, setModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
@@ -45,28 +58,49 @@ export default function MasjidConnectClientPage() {
   const [sortOrder, setSortOrder] = useState('0')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [currentPhotoUrl, setCurrentPhotoUrl] = useState('')
+  // null = "All Campaigns", number = specific campaign
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string>('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const fetchMasjids = () => {
-    return api.get(`/api/admin/masjid-connect/${clientId}`)
-      .then(({ data }) => setMasjids(data))
+  const isMultiCampaign = client?.client_type === 'multi_campaign'
+
+  const fetchMasjids = async () => {
+    const { data } = await api.get(`/api/admin/masjid-connect/${clientId}`)
+    setAllMasjids(data)
   }
 
   useEffect(() => {
     Promise.all([
       api.get(`/api/admin/masjid-connect/${clientId}`),
       api.get('/api/admin/clients'),
-    ]).then(([mRes, cRes]) => {
-      setMasjids(mRes.data)
-      const found = cRes.data.find((c: { id: number; name: string }) => String(c.id) === clientId)
-      setClientName(found?.name ?? '')
+      api.get('/api/admin/campaigns', { params: { client_id: clientId } }),
+    ]).then(([mRes, cRes, campRes]) => {
+      setAllMasjids(mRes.data)
+      const found = cRes.data.find((c: ClientDetail) => String(c.id) === clientId) ?? null
+      setClient(found)
+      setCampaigns(campRes.data)
     }).finally(() => setLoading(false))
   }, [clientId])
+
+  // Derived: masjids shown in current tab
+  const visibleMasjids = isMultiCampaign
+    ? (activeTab === null
+        ? allMasjids.filter(m => m.campaign_id === null)
+        : allMasjids.filter(m => m.campaign_id === activeTab))
+    : allMasjids
+
+  // Count per tab for badges
+  const countForTab = (tab: TabKey) =>
+    tab === null
+      ? allMasjids.filter(m => m.campaign_id === null).length
+      : allMasjids.filter(m => m.campaign_id === tab).length
 
   const openAdd = () => {
     setEditingId(null)
     setName(''); setCity(''); setCountry('United States'); setSortOrder('0')
     setPhotoFile(null); setCurrentPhotoUrl('')
+    // Pre-select tab's campaign
+    setSelectedCampaignId(activeTab === null ? '' : String(activeTab))
     setError('')
     setModalOpen(true)
   }
@@ -75,6 +109,7 @@ export default function MasjidConnectClientPage() {
     setEditingId(m.id)
     setName(m.masjid_name); setCity(m.city); setCountry(m.country); setSortOrder(String(m.sort_order))
     setPhotoFile(null); setCurrentPhotoUrl(m.screen_photo_url)
+    setSelectedCampaignId(m.campaign_id === null ? '' : String(m.campaign_id))
     setError('')
     setModalOpen(true)
   }
@@ -90,6 +125,12 @@ export default function MasjidConnectClientPage() {
       fd.append('country', country)
       fd.append('sort_order', sortOrder)
       if (photoFile) fd.append('screen_photo', photoFile)
+      // Send campaign_id — empty string means null (all campaigns)
+      if (selectedCampaignId) {
+        fd.append('campaign_id', selectedCampaignId)
+      } else {
+        fd.append('campaign_id', '')
+      }
 
       if (editingId) {
         fd.append('_method', 'PUT')
@@ -114,7 +155,13 @@ export default function MasjidConnectClientPage() {
   const handleDelete = async (id: number) => {
     if (!confirm('Delete this masjid entry?')) return
     await api.delete(`/api/admin/masjid-connect/${clientId}/${id}`)
-    setMasjids(prev => prev.filter(m => m.id !== id))
+    setAllMasjids(prev => prev.filter(m => m.id !== id))
+  }
+
+  const getCampaignBadge = (m: MasjidRecord) => {
+    if (m.campaign_id === null) return { label: 'All Campaigns', bg: '#f1f5f9', text: '#475569' }
+    const camp = campaigns.find(c => c.id === m.campaign_id)
+    return { label: camp?.name ?? `Campaign ${m.campaign_id}`, bg: '#dbeafe', text: '#1e40af' }
   }
 
   return (
@@ -126,7 +173,7 @@ export default function MasjidConnectClientPage() {
             ← MasjidConnect
           </Link>
           <h1 className="text-lg font-bold text-gray-900">
-            MasjidConnect — {clientName || '…'}
+            MasjidConnect — {client?.name || '…'}
           </h1>
         </div>
         <button
@@ -137,6 +184,58 @@ export default function MasjidConnectClientPage() {
           + Add Masjid
         </button>
       </div>
+
+      {/* Campaign tabs — multi_campaign only */}
+      {!loading && isMultiCampaign && campaigns.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap mb-6">
+          {/* "All Campaigns" tab = null */}
+          <button
+            onClick={() => setActiveTab(null)}
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-colors"
+            style={
+              activeTab === null
+                ? { backgroundColor: '#1a4a2e', color: 'white' }
+                : { backgroundColor: '#f1f5f9', color: '#475569' }
+            }
+          >
+            All Campaigns
+            <span
+              className="text-xs font-bold px-1.5 py-0.5 rounded-full"
+              style={
+                activeTab === null
+                  ? { backgroundColor: 'rgba(255,255,255,0.25)', color: 'white' }
+                  : { backgroundColor: '#e2e8f0', color: '#64748b' }
+              }
+            >
+              {countForTab(null)}
+            </span>
+          </button>
+          {campaigns.map(c => (
+            <button
+              key={c.id}
+              onClick={() => setActiveTab(c.id)}
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-colors"
+              style={
+                activeTab === c.id
+                  ? { backgroundColor: '#1a4a2e', color: 'white' }
+                  : { backgroundColor: '#f1f5f9', color: '#475569' }
+              }
+            >
+              <span className="max-w-[140px] truncate">{c.name}</span>
+              <span
+                className="text-xs font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
+                style={
+                  activeTab === c.id
+                    ? { backgroundColor: 'rgba(255,255,255,0.25)', color: 'white' }
+                    : { backgroundColor: '#e2e8f0', color: '#64748b' }
+                }
+              >
+                {countForTab(c.id)}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Grid */}
       {loading ? (
@@ -151,58 +250,69 @@ export default function MasjidConnectClientPage() {
             </div>
           ))}
         </div>
-      ) : masjids.length === 0 ? (
+      ) : visibleMasjids.length === 0 ? (
         <div
           className="bg-white rounded-2xl flex flex-col items-center justify-center py-20"
           style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}
         >
-          <div className="mb-4 opacity-30"><MosqueIcon size={56} /></div>
+          <div className="mb-4 opacity-30"><MosqueIcon size={56} color="#C9A84C" /></div>
           <p className="text-sm font-medium text-[#64748b]">No masjids added yet</p>
           <p className="text-xs text-[#94a3b8] mt-1">Click &ldquo;+ Add Masjid&rdquo; to get started</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          {masjids.map(m => (
-            <div
-              key={m.id}
-              className="bg-white rounded-2xl overflow-hidden"
-              style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.08)', border: '1px solid #e5e7eb' }}
-            >
-              <div style={{ height: 200, overflow: 'hidden', position: 'relative' }}>
-                <img src={m.screen_photo_url} alt={m.masjid_name} className="w-full h-full object-cover" />
-                <span
-                  className="absolute top-3 right-3 text-xs font-bold px-2 py-0.5 rounded-full"
-                  style={{ backgroundColor: 'rgba(0,0,0,0.6)', color: 'white' }}
-                >
-                  #{m.sort_order}
-                </span>
-              </div>
-              <div className="p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold text-gray-900 text-sm">{m.masjid_name}</p>
-                    <p className="text-xs text-[#64748b] mt-0.5">{m.city}, {m.country}</p>
-                  </div>
-                  <div className="flex gap-2 flex-shrink-0">
-                    <button
-                      onClick={() => openEdit(m)}
-                      className="text-xs font-semibold px-3 py-1 rounded-full"
-                      style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(m.id)}
-                      className="text-xs font-semibold px-3 py-1 rounded-full"
-                      style={{ backgroundColor: '#fff5f5', color: '#dc2626' }}
-                    >
-                      Delete
-                    </button>
+          {visibleMasjids.map(m => {
+            const badge = getCampaignBadge(m)
+            return (
+              <div
+                key={m.id}
+                className="bg-white rounded-2xl overflow-hidden"
+                style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.08)', border: '1px solid #e5e7eb' }}
+              >
+                <div style={{ height: 200, overflow: 'hidden', position: 'relative' }}>
+                  <img src={m.screen_photo_url} alt={m.masjid_name} className="w-full h-full object-cover" />
+                  <span
+                    className="absolute top-3 right-3 text-xs font-bold px-2 py-0.5 rounded-full"
+                    style={{ backgroundColor: 'rgba(0,0,0,0.6)', color: 'white' }}
+                  >
+                    #{m.sort_order}
+                  </span>
+                </div>
+                <div className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-gray-900 text-sm">{m.masjid_name}</p>
+                      <p className="text-xs text-[#64748b] mt-0.5">{m.city}, {m.country}</p>
+                      {isMultiCampaign && (
+                        <span
+                          className="inline-block mt-1.5 text-xs font-semibold px-2 py-0.5 rounded-full truncate max-w-full"
+                          style={{ backgroundColor: badge.bg, color: badge.text }}
+                        >
+                          {badge.label}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => openEdit(m)}
+                        className="text-xs font-semibold px-3 py-1 rounded-full"
+                        style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(m.id)}
+                        className="text-xs font-semibold px-3 py-1 rounded-full"
+                        style={{ backgroundColor: '#fff5f5', color: '#dc2626' }}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
@@ -221,6 +331,26 @@ export default function MasjidConnectClientPage() {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Campaign selector — multi_campaign only */}
+              {isMultiCampaign && campaigns.length > 0 && (
+                <div>
+                  <label className="block text-xs font-semibold text-[#64748b] mb-1.5">Campaign</label>
+                  <select
+                    value={selectedCampaignId}
+                    onChange={e => setSelectedCampaignId(e.target.value)}
+                    className={selectCls}
+                  >
+                    <option value="">All Campaigns (global)</option>
+                    {campaigns.map(c => (
+                      <option key={c.id} value={String(c.id)}>{c.name}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-[#94a3b8] mt-1">
+                    &ldquo;All Campaigns&rdquo; shows this masjid for every campaign under this client.
+                  </p>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-semibold text-[#64748b] mb-1.5">Masjid Name *</label>
                 <input required value={name} onChange={e => setName(e.target.value)} className={inputCls} placeholder="e.g. Masjid Al-Noor" />
