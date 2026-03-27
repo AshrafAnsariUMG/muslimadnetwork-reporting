@@ -11,7 +11,6 @@ use Google\Service\Dfareporting\Report;
 use Google\Service\Dfareporting\ReportCriteria;
 use Google\Service\Dfareporting\ReportFloodlightCriteria;
 use Google\Service\Dfareporting\SortedDimension;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class CM360Service
@@ -531,12 +530,11 @@ class CM360Service
     }
 
     /**
-     * Download a completed report file using the access token.
+     * Download a completed report file using the Google library's authorized Guzzle client.
      */
     private function downloadReportFile(string $reportId, string $fileId): string
     {
-        $accessToken = $this->client->getAccessToken();
-        $token = $accessToken['access_token'] ?? '';
+        $httpClient = $this->client->authorize();
 
         $url = sprintf(
             'https://www.googleapis.com/dfareporting/v4/userprofiles/%s/reports/%s/files/%s?alt=media',
@@ -545,13 +543,15 @@ class CM360Service
             $fileId
         );
 
-        $response = Http::withToken($token)->get($url);
-
-        if ($response->failed()) {
-            throw new \RuntimeException('Failed to download CM360 report file: HTTP ' . $response->status());
+        try {
+            $response = $httpClient->request('GET', $url, ['stream' => false]);
+        } catch (\GuzzleHttp\Exception\ClientException $e) {
+            throw new \RuntimeException(
+                'Failed to download CM360 report file: HTTP ' . $e->getResponse()->getStatusCode(), 0, $e
+            );
         }
 
-        return $response->body();
+        return (string) $response->getBody();
     }
 
     /**
