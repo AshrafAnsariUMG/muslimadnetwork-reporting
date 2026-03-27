@@ -25,7 +25,6 @@ type VisibilityMap = Record<string, SectionVisibility>
 
 const SECTIONS: { key: string; label: string; hasRows: boolean }[] = [
   { key: 'summary',    label: 'Summary',           hasRows: false },
-  { key: 'pacing',     label: 'Impression Pacing', hasRows: false },
   { key: 'device',     label: 'Device Breakdown',  hasRows: true  },
   { key: 'domain',     label: 'Domain Breakdown',  hasRows: true  },
   { key: 'app',        label: 'App Breakdown',      hasRows: true  },

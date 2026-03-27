@@ -45,7 +45,7 @@ class CampaignSummaryController extends Controller
         }
 
         $dateFrom = Carbon::parse($campaign->start_date)->format('Y-m-d');
-        $dateTo   = Carbon::parse($campaign->end_date)->format('Y-m-d');
+        $dateTo   = Carbon::today()->format('Y-m-d');
 
         // Fetch all report types from cache (no new CM360 calls)
         $summary  = $this->getCached($campaign->id, $dateFrom, $dateTo, 'summary');
@@ -53,17 +53,8 @@ class CampaignSummaryController extends Controller
         $site     = $this->getCached($campaign->id, $dateFrom, $dateTo, 'site');
         $creative = $this->getCached($campaign->id, $dateFrom, $dateTo, 'creative');
 
-        // Pacing data
-        $todayStr       = Carbon::today()->format('Y-m-d');
-        $pacingSummary  = $this->getCached($campaign->id, $dateFrom, $todayStr, 'summary') ?? $summary;
-        $contracted     = (int) $campaign->contracted_impressions;
-        $delivered      = (int) ($pacingSummary['impressions'] ?? 0);
-
-        $start      = Carbon::parse($campaign->start_date);
-        $end        = Carbon::parse($campaign->end_date);
-        $totalDays  = max(1, $start->diffInDays($end));
-        $elapsed    = max(0, min($start->diffInDays(Carbon::today()), $totalDays));
-        $expectedPct  = round(($elapsed / $totalDays) * 100, 1);
+        $contracted   = (int) $campaign->contracted_impressions;
+        $delivered    = (int) ($summary['impressions'] ?? 0);
         $deliveredPct = $contracted > 0 ? round(($delivered / $contracted) * 100, 1) : 0;
 
         $networkAvgCtr = (float) config('reporting.network_avg_ctr', 0.05);
@@ -105,7 +96,6 @@ class CampaignSummaryController extends Controller
             'contracted'     => $contracted,
             'delivered'      => $delivered,
             'deliveredPct'   => $deliveredPct,
-            'expectedPct'    => $expectedPct,
             'networkAvgCtr'  => $networkAvgCtr,
             'ctrVsBenchmark' => $ctrVsBenchmark,
             'healthScore'    => $healthScore,

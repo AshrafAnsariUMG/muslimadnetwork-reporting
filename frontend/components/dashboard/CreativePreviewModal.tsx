@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { CreativeRow, CreativeMetadata } from '@/types/reports'
 import { formatNumber, formatCTR } from '@/lib/dateUtils'
 
@@ -42,10 +43,12 @@ export default function CreativePreviewModal({ creative, totalImpressions, onClo
 
   const typeStyle = meta?.type ? (CREATIVE_TYPE_STYLES[meta.type] ?? { bg: '#f1f5f9', text: '#475569' }) : null
 
-  return (
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}
+      className="fixed inset-0 flex items-center justify-center p-4"
+      style={{ zIndex: 9999, backgroundColor: 'rgba(0,0,0,0.8)' }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
       <div
@@ -241,6 +244,7 @@ export default function CreativePreviewModal({ creative, totalImpressions, onClo
           })()}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

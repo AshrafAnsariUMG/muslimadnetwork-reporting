@@ -128,7 +128,6 @@ Route::middleware(['auth:sanctum', 'role:client'])->group(function () {
 
     // Reports
     Route::get('/reports/campaigns',           [ReportController::class, 'campaigns']);
-    Route::get('/reports/pacing',              [ReportController::class, 'pacing']);
     Route::get('/reports/creatives/metadata',  [ReportController::class, 'creativesMetadata']);
     Route::get('/reports/summary',   [ReportController::class, 'summary']);
     Route::get('/reports/device',    [ReportController::class, 'device']);

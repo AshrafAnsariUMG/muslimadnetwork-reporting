@@ -14,7 +14,6 @@ class Campaign extends Model
         'name',
         'status',
         'start_date',
-        'end_date',
         'contracted_impressions',
         'contracted_clicks',
         'is_primary',
@@ -27,7 +26,6 @@ class Campaign extends Model
         return [
             'status' => CampaignStatus::class,
             'start_date' => 'date',
-            'end_date' => 'date',
             'is_primary' => 'boolean',
             'has_conversion_tracking' => 'boolean',
             'contracted_impressions' => 'integer',

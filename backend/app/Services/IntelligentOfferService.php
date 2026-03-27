@@ -18,14 +18,11 @@ class IntelligentOfferService
         // ── Pacing data ────────────────────────────────────────────────────────
         $contracted = (int) $campaign->contracted_impressions;
         $start      = Carbon::parse($campaign->start_date);
-        $end        = Carbon::parse($campaign->end_date);
         $today      = Carbon::today();
 
-        $totalDays     = max(1, $start->diffInDays($end));
-        $elapsedDays   = max(0, min($start->diffInDays($today), $totalDays));
-        $daysRemaining = max(0, $today->diffInDays($end, false));
-
-        $expectedPct  = ($elapsedDays / $totalDays) * 100;
+        $elapsedDays   = max(0, $start->diffInDays($today));
+        $daysRemaining = 0; // end_date removed
+        $expectedPct   = 0; // cannot calculate without end_date
 
         // ── Get most recent cached summary for this campaign ───────────────────
         $summaryCache = ReportCache::where('campaign_id', $campaign->id)
@@ -44,33 +41,7 @@ class IntelligentOfferService
         $impressionsFmt = number_format($impressions);
         $campaignName = $campaign->name;
 
-        // ── Trigger 1: Behind pace, campaign ending soon ───────────────────────
-        if ($deliveredPct < ($expectedPct - 20) && $daysRemaining <= 14 && $daysRemaining > 0) {
-            return [[
-                'id'           => 'intelligent_behind_pace_ending_soon',
-                'title'        => 'Your campaign needs a boost 🚀',
-                'body'         => "You're behind pace with {$daysRemaining} days left. Add more impressions now to guarantee your contracted delivery.",
-                'cta_label'    => 'Add Impressions',
-                'cta_url'      => "mailto:support@muslimadnetwork.com?subject=Add+Impressions+-+{$campaignName}",
-                'trigger'      => 'behind_pace_ending_soon',
-                'urgency'      => 'high',
-                'is_intelligent' => true,
-            ]];
-        }
-
-        // ── Trigger 2: Campaign ending soon, good performance ──────────────────
-        if ($daysRemaining <= 7 && $daysRemaining > 0 && $deliveredPct >= ($expectedPct - 10)) {
-            return [[
-                'id'           => 'intelligent_campaign_ending_good_performance',
-                'title'        => "Your campaign ends in {$daysRemaining} days",
-                'body'         => "Your campaign is performing well with {$impressionsFmt} impressions delivered. Renew now to keep the momentum going.",
-                'cta_label'    => 'Renew Campaign',
-                'cta_url'      => "mailto:support@muslimadnetwork.com?subject=Renew+Campaign+-+{$campaignName}",
-                'trigger'      => 'campaign_ending_good_performance',
-                'urgency'      => 'medium',
-                'is_intelligent' => true,
-            ]];
-        }
+        // Triggers 1 & 2 (behind pace / ending soon) required end_date — removed.
 
         // ── Trigger 3: Strong CTR, suggest scaling ─────────────────────────────
         if ($ctr >= ($networkAvgCtr * 2) && $deliveredPct < 50) {

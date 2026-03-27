@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { CreativeRow, CreativeMetadata } from '@/types/reports'
 import { formatNumber, formatCTR } from '@/lib/dateUtils'
 import VisibilityToggle from './VisibilityToggle'
@@ -475,10 +476,10 @@ export default function CreativeBreakdownGrid({
       )}
 
       {/* All Creatives modal */}
-      {modalOpen && (
+      {modalOpen && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+          className="fixed inset-0 flex items-center justify-center p-4"
+          style={{ zIndex: 9999, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
           onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}
         >
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[85vh] flex flex-col">
@@ -534,16 +535,18 @@ export default function CreativeBreakdownGrid({
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Creative detail / preview modal */}
-      {previewCreative && (
+      {previewCreative && typeof document !== 'undefined' && createPortal(
         <CreativePreviewModal
           creative={previewCreative}
           totalImpressions={totalImpressions}
           onClose={() => setPreviewCreative(null)}
-        />
+        />,
+        document.body
       )}
     </div>
   )

@@ -8,7 +8,6 @@ use App\Models\ReportCache;
 use App\Services\CreativeEvaluationService;
 use App\Services\DisplayNameService;
 use App\Services\ReportCacheService;
-use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -127,47 +126,6 @@ class ReportController extends Controller
         return response()->json(array_values($metadata));
     }
 
-    public function pacing(Request $request): JsonResponse
-    {
-        $request->validate(['campaign_id' => 'sometimes|integer']);
-
-        $client = $request->user()->client;
-
-        if (!$client) {
-            abort(422, 'No client associated with this user.');
-        }
-
-        if ($client->client_type->value === 'multi_campaign') {
-            if (!$request->has('campaign_id')) {
-                abort(422, 'campaign_id is required for multi-campaign clients.');
-            }
-            $campaign = Campaign::where('id', $request->integer('campaign_id'))
-                ->where('client_id', $client->id)
-                ->firstOrFail();
-        } else {
-            $campaign = Campaign::where('client_id', $client->id)
-                ->where('is_primary', true)
-                ->firstOrFail();
-        }
-
-        if (!$campaign->contracted_impressions) {
-            return response()->json(['available' => false]);
-        }
-
-        $dateFrom = Carbon::parse($campaign->start_date)->format('Y-m-d');
-        $dateTo   = Carbon::today()->format('Y-m-d');
-
-        $summaryData = $this->cache->get($campaign, $dateFrom, $dateTo, 'summary');
-
-        return response()->json([
-            'impressions' => (int) ($summaryData['impressions'] ?? 0),
-            'contracted'  => (int) $campaign->contracted_impressions,
-            'start_date'  => $dateFrom,
-            'end_date'    => Carbon::parse($campaign->end_date)->format('Y-m-d'),
-            'as_of'       => $dateTo,
-        ]);
-    }
-
     public function campaigns(Request $request): JsonResponse
     {
         $client = $request->user()->client;
@@ -179,7 +137,7 @@ class ReportController extends Controller
         $campaigns = Campaign::where('client_id', $client->id)
             ->orderByRaw("FIELD(status, 'active', 'upcoming', 'paused', 'ended')")
             ->orderByDesc('start_date')
-            ->get(['id', 'name', 'cm360_campaign_id', 'status', 'start_date', 'end_date',
+            ->get(['id', 'name', 'cm360_campaign_id', 'status', 'start_date',
                    'contracted_impressions', 'contracted_clicks', 'is_primary', 'has_conversion_tracking']);
 
         return response()->json($campaigns);

@@ -9,18 +9,9 @@ import { useVisibility } from '@/hooks/useVisibility'
 import { getDefaultDateRange, formatDate, formatNumber, formatCTR, formatConversions } from '@/lib/dateUtils'
 import { Campaign, SummaryReport, DeviceRow, SiteBreakdown, CreativeRow, ConversionReport } from '@/types/reports'
 
-interface PacingData {
-  available?: false
-  impressions: number
-  contracted: number
-  start_date: string
-  end_date: string
-  as_of: string
-}
 import CampaignSwitcher from '@/components/dashboard/CampaignSwitcher'
 import DateRangePicker from '@/components/dashboard/DateRangePicker'
 import StatCard from '@/components/dashboard/StatCard'
-import PacingBar from '@/components/dashboard/PacingBar'
 import ConversionCard from '@/components/dashboard/ConversionCard'
 import DeviceBreakdownChart from '@/components/dashboard/DeviceBreakdownChart'
 import DomainBreakdownCards from '@/components/dashboard/DomainBreakdownCards'
@@ -197,17 +188,6 @@ function DashboardContent() {
 
   const campaignId = selectedCampaign?.id
 
-  // Pacing data — fetched from campaign start to today, independent of date range picker
-  const [pacingData, setPacingData] = useState<PacingData | null>(null)
-  useEffect(() => {
-    if (!campaignId) return
-    const params: Record<string, number> = {}
-    if (client?.client_type === 'multi_campaign') params.campaign_id = campaignId
-    api.get<PacingData | { available: false }>('/api/reports/pacing', { params })
-      .then(({ data }) => setPacingData(data as PacingData))
-      .catch(() => setPacingData(null))
-  }, [campaignId, client?.client_type])
-
   const summary    = useReport<SummaryReport>('summary', dateFrom, dateTo, campaignId)
   const device     = useReport<DeviceRow[]>('device', dateFrom, dateTo, campaignId)
   const site       = useReport<SiteBreakdown>('site', dateFrom, dateTo, campaignId)
@@ -354,7 +334,7 @@ function DashboardContent() {
                 </span>
               )}
               <span className="text-xs text-gray-400">
-                {formatDate(selectedCampaign.start_date)} – {formatDate(selectedCampaign.end_date)}
+                Started {formatDate(selectedCampaign.start_date)}
               </span>
             </div>
           </div>
@@ -456,28 +436,8 @@ function DashboardContent() {
           </div>
         )}
 
-        {/* Divider: Summary → Pacing */}
+        {/* Divider: Summary → Conversion */}
         <IslamicDivider variant="full" />
-
-        {/* Pacing bar — uses campaign-start-to-today data, not date range picker */}
-        {pacingData && pacingData.available !== false && pacingData.contracted > 0 && (isImpersonating || !isHidden('pacing')) && (
-          <div style={{ opacity: isHidden('pacing') ? 0.4 : 1, transition: 'opacity 200ms ease' }}>
-            {isImpersonating && (
-              <div className="flex justify-end mb-1">
-                <VisibilityToggle
-                  isHidden={isHidden('pacing')}
-                  onToggle={() => toggle('pacing', 'section', null, !isHidden('pacing'))}
-                />
-              </div>
-            )}
-            <PacingBar
-              contracted={pacingData.contracted}
-              delivered={pacingData.impressions}
-              startDate={pacingData.start_date}
-              endDate={pacingData.end_date}
-            />
-          </div>
-        )}
 
         {/* Conversion cards */}
         {conversionEnabled && !conversionRaw.isLoading && !conversionRaw.error && (isImpersonating || !isHidden('conversion')) && (
@@ -496,7 +456,7 @@ function DashboardContent() {
           </div>
         )}
 
-        {/* Divider: Pacing → Device */}
+        {/* Divider: Conversion → Device */}
         <IslamicDivider variant="simple" />
 
         {/* Device Breakdown */}

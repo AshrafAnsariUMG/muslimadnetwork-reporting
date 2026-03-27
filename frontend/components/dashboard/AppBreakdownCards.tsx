@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { AppRow } from '@/types/reports'
 import { formatNumber, formatCTR } from '@/lib/dateUtils'
 import VisibilityToggle from './VisibilityToggle'
@@ -135,10 +136,10 @@ export default function AppBreakdownCards({
       )}
 
       {/* Modal */}
-      {modalOpen && (
+      {modalOpen && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+          className="fixed inset-0 flex items-center justify-center p-4"
+          style={{ zIndex: 9999, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
           onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}
         >
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
@@ -200,7 +201,8 @@ export default function AppBreakdownCards({
               </table>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

@@ -10,7 +10,6 @@ interface Campaign {
   cm360_campaign_id: string
   status: string
   start_date: string
-  end_date: string
   contracted_impressions: number | null
   contracted_clicks: number | null
   is_primary: boolean
@@ -26,7 +25,6 @@ const emptyForm = {
   cm360_campaign_id: '',
   status: 'active',
   start_date: '',
-  end_date: '',
   contracted_impressions: '',
   contracted_clicks: '',
   is_primary: true,
@@ -91,7 +89,6 @@ export default function CampaignsPage() {
       cm360_campaign_id: c.cm360_campaign_id,
       status: c.status,
       start_date: c.start_date,
-      end_date: c.end_date,
       contracted_impressions: c.contracted_impressions?.toString() ?? '',
       contracted_clicks: c.contracted_clicks?.toString() ?? '',
       is_primary: c.is_primary,
@@ -203,7 +200,6 @@ export default function CampaignsPage() {
                     </td>
                     <td className="px-5 py-3 text-[#64748b] text-xs">
                       <div>{c.start_date}</div>
-                      <div>{c.end_date}</div>
                     </td>
                     <td className="px-5 py-3">
                       <div className="flex gap-2">
@@ -283,27 +279,15 @@ export default function CampaignsPage() {
                   <option value="upcoming">Upcoming</option>
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-[#64748b] mb-1.5">Start Date *</label>
-                  <input
-                    type="date"
-                    required
-                    value={form.start_date}
-                    onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))}
-                    className={inputCls}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-[#64748b] mb-1.5">End Date *</label>
-                  <input
-                    type="date"
-                    required
-                    value={form.end_date}
-                    onChange={e => setForm(f => ({ ...f, end_date: e.target.value }))}
-                    className={inputCls}
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#64748b] mb-1.5">Start Date *</label>
+                <input
+                  type="date"
+                  required
+                  value={form.start_date}
+                  onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))}
+                  className={inputCls}
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>

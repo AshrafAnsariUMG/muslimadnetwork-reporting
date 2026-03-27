@@ -68,7 +68,6 @@ export interface Campaign {
   name: string
   status: string
   start_date: string
-  end_date: string
   contracted_impressions: number | null
   contracted_clicks: number | null
   has_conversion_tracking: boolean
