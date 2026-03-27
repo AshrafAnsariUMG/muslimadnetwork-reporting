@@ -2,7 +2,9 @@
 
 use App\Http\Controllers\Api\Admin\AuditLogController;
 use App\Http\Controllers\Api\Admin\DisplayNameController;
+use App\Http\Controllers\Api\Admin\MasjidConnectController as AdminMasjidConnectController;
 use App\Http\Controllers\Api\Admin\OfferAdminController;
+use App\Http\Controllers\Api\Client\MasjidConnectController as ClientMasjidConnectController;
 use App\Http\Controllers\Api\Client\OfferController;
 use App\Http\Controllers\Api\Admin\CacheController;
 use App\Http\Controllers\Api\Admin\CampaignController;
@@ -96,6 +98,13 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::post('/admin/display-names', [DisplayNameController::class, 'store']);
     Route::delete('/admin/display-names/{id}', [DisplayNameController::class, 'destroy']);
 
+    // MasjidConnect admin
+    Route::get('/admin/masjid-connect/{client_id}', [AdminMasjidConnectController::class, 'index']);
+    Route::post('/admin/masjid-connect/{client_id}', [AdminMasjidConnectController::class, 'store']);
+    Route::put('/admin/masjid-connect/{client_id}/{id}', [AdminMasjidConnectController::class, 'update']);
+    Route::delete('/admin/masjid-connect/{client_id}/{id}', [AdminMasjidConnectController::class, 'destroy']);
+    Route::post('/admin/clients/{id}/toggle-masjidconnect', [AdminMasjidConnectController::class, 'toggle']);
+
     // CM360 test
     Route::get('/admin/cm360-test', function () {
         try {
@@ -125,6 +134,9 @@ Route::middleware(['auth:sanctum', 'role:client'])->group(function () {
     // Offers
     Route::get('/client/offers', [OfferController::class, 'index']);
     Route::post('/client/offers/{id}/dismiss', [OfferController::class, 'dismiss'])->where('id', '.*');
+
+    // MasjidConnect client
+    Route::get('/client/masjid-connect', [ClientMasjidConnectController::class, 'index']);
 
     // Reports
     Route::get('/reports/campaigns',           [ReportController::class, 'campaigns']);

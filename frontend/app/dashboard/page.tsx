@@ -21,7 +21,9 @@ import { useCreativeMetadata } from '@/hooks/useCreativeMetadata'
 import IslamicDivider from '@/components/ui/IslamicDivider'
 import VisibilityToggle from '@/components/dashboard/VisibilityToggle'
 import OffersStack from '@/components/dashboard/OffersStack'
+import MasjidConnectSection from '@/components/dashboard/MasjidConnectSection'
 import { useOffers } from '@/hooks/useOffers'
+import { useMasjidConnect } from '@/hooks/useMasjidConnect'
 import api from '@/lib/api'
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
@@ -209,6 +211,7 @@ function DashboardContent() {
   // Visibility
   const { isHidden, toggle } = useVisibility(client?.id)
   const { offers, dismissOffer } = useOffers()
+  const { data: masjidData, isLoading: masjidLoading } = useMasjidConnect()
 
   const handleDateChange = (from: string, to: string) => {
     setDateFrom(from)
@@ -606,6 +609,33 @@ function DashboardContent() {
             ) : null}
           </SectionCard>
         </div>
+
+        {/* MasjidConnect — always shown (showcase or marketing) */}
+        {(isImpersonating || !isHidden('masjidconnect')) && (
+          <>
+            <IslamicDivider variant="simple" />
+            <div
+              className="fade-in-up"
+              style={{
+                animationDelay: '400ms',
+                opacity: isHidden('masjidconnect') ? 0.4 : 1,
+                transition: 'opacity 200ms ease',
+              }}
+            >
+              {isImpersonating && (
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">MasjidConnect</span>
+                  <VisibilityToggle
+                    isHidden={isHidden('masjidconnect')}
+                    onToggle={() => toggle('masjidconnect', 'section', null, !isHidden('masjidconnect'))}
+                    size="md"
+                  />
+                </div>
+              )}
+              <MasjidConnectSection data={masjidData} isLoading={masjidLoading} />
+            </div>
+          </>
+        )}
 
       </div>
     </div>

@@ -26,6 +26,15 @@ const TagIcon = () => (
   </svg>
 )
 
+const MasjidIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+    <path d="M12 2C9 2 7 4 7 6c0 1.5.8 2.8 2 3.5V11H5l-2 2h18l-2-2h-4V9.5c1.2-.7 2-2 2-3.5 0-2-2-4-5-4z" />
+    <rect x="3" y="13" width="18" height="9" rx="1" />
+    <line x1="12" y1="13" x2="12" y2="22" />
+    <line x1="3" y1="18" x2="21" y2="18" />
+  </svg>
+)
+
 const HamburgerIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <line x1="3" y1="6" x2="21" y2="6" />
@@ -48,6 +57,7 @@ const navLinks: { href: string; label: string; icon?: React.ReactNode }[] = [
   { href: '/admin/campaigns', label: 'Campaigns' },
   { href: '/admin/visibility', label: 'Visibility', icon: <EyeNavIcon /> },
   { href: '/admin/display-names', label: 'Display Names', icon: <TagIcon /> },
+  { href: '/admin/masjid-connect', label: 'MasjidConnect', icon: <MasjidIcon /> },
   { href: '/admin/offers', label: 'Offers', icon: <MegaphoneIcon /> },
   { href: '/admin/audit-log', label: 'Audit Log' },
 ]

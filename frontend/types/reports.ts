@@ -83,3 +83,17 @@ export interface Client {
   client_type: string
   features: Record<string, unknown> | null
 }
+
+export interface MasjidEntry {
+  id: number
+  masjid_name: string
+  city: string
+  country: string
+  screen_photo_url: string
+  sort_order: number
+}
+
+export interface MasjidConnectData {
+  enabled: boolean
+  masjids: MasjidEntry[]
+}

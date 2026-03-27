@@ -48,11 +48,13 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 │   │   │   │       ├── CacheController.php       # Manual cache invalidation
 │   │   │   │       ├── OnboardingController.php  # Send onboarding email (resets password + emails credentials)
 │   │   │       ├── VisibilityController.php  # Admin visibility CRUD (overview/show/upsert/reset)
-│   │   │       └── DisplayNameController.php # GET/POST/DELETE /api/admin/display-names; upsert on client_id+section+original_key
+│   │   │       ├── DisplayNameController.php # GET/POST/DELETE /api/admin/display-names; upsert on client_id+section+original_key
+│   │   │       └── MasjidConnectController.php # CRUD for masjid entries per client; toggle-masjidconnect on client; stores photos in public disk masjid-screens/
 │   │   │   ├── AppIconController.php         # GET /api/app-icon?bundle_id= (auth:sanctum, any role); scrapes Play Store og:image; DB-cached 7 days
 │   │   │   └── Client/
 │   │   │       ├── VisibilityController.php      # Client reads own visibility settings
-│   │   │       └── OfferController.php           # GET /api/client/offers (manual + intelligent, non-dismissed); POST /api/client/offers/{id}/dismiss (handles "intelligent_*" IDs)
+│   │   │       ├── OfferController.php           # GET /api/client/offers (manual + intelligent, non-dismissed); POST /api/client/offers/{id}/dismiss (handles "intelligent_*" IDs)
+│   │   │       └── MasjidConnectController.php   # GET /api/client/masjid-connect → {enabled, masjids[]} (active only, sorted by sort_order)
 │   │   │   └── Middleware/
 │   │   │       └── RoleMiddleware.php
 │   │   ├── Services/
@@ -76,7 +78,8 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 │   │       ├── IntelligentOfferDismissal.php # user_id, trigger_name, dismissed_at; unique(user_id, trigger_name)
 │   │       ├── ClientVisit.php              # user_id, client_id, visited_at; index(user_id, client_id, visited_at)
 │   │       ├── AppIconCache.php             # bundle_id (unique), icon_url, app_name, fetched_at, expires_at; 7-day TTL
-│   │       └── ClientDisplayName.php        # client_id (nullable FK→clients), section (domain|app), original_key, display_name, updated_by (FK→users); unique(client_id,section,original_key)
+│   │       ├── ClientDisplayName.php        # client_id (nullable FK→clients), section (domain|app), original_key, display_name, updated_by (FK→users); unique(client_id,section,original_key)
+│   │       └── MasjidConnect.php            # client_id FK, masjid_name, city, country, screen_photo_path, is_active, sort_order; belongsTo Client
 │   ├── config/
 │   │   ├── cors.php
 │   │   ├── sanctum.php
@@ -106,11 +109,13 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
     │   └── admin/
     │       ├── layout.tsx               # Sidebar nav + top bar, RouteGuard role=admin
     │       ├── page.tsx                 # Stats dashboard (4 stat cards)
-    │       ├── clients/page.tsx         # Client CRUD + impersonate
+    │       ├── clients/page.tsx         # Client CRUD + impersonate + MasjidConnect toggle per row + "Manage" link
     │       ├── users/page.tsx           # User CRUD + password generation
     │       ├── campaigns/page.tsx       # Campaign CRUD + client filter
     │       ├── visibility/page.tsx      # Visibility management — overview cards + per-client accordion panel
     │       ├── display-names/page.tsx   # Rename rules CRUD: section/scope filters; Add Rule modal with live preview, global or per-client scope
+    │       ├── masjid-connect/page.tsx  # Overview: lists clients with MasjidConnect enabled; "Manage Masjids" per client
+    │       ├── masjid-connect/[clientId]/page.tsx  # Per-client masjid management: add/edit/delete cards with photo upload (multipart FormData)
     │       ├── audit-log/page.tsx       # Full audit log: filters (date/action/admin), paginated table (50/page), expandable metadata, CSV export
     │       └── offers/page.tsx          # Offers CRUD table; toggle active; create/edit modal with live banner preview
     ├── context/
@@ -119,19 +124,19 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
     │   ├── useReport.ts                 # Generic report data hook (type, dateFrom, dateTo, campaignId); clears data on dep change
     │   ├── useVisibility.ts             # Fetches /api/client/visibility; isHidden(section, rowKey?), toggle()
     │   ├── useOffers.ts                 # Fetches /api/client/offers; dismissOffer(id) optimistic update
-    │   └── useCreativeMetadata.ts       # Fetches /api/reports/creatives/metadata; returns Record<name, CreativeMetadata>; refetches on campaignId change
+    │   ├── useCreativeMetadata.ts       # Fetches /api/reports/creatives/metadata; returns Record<name, CreativeMetadata>; refetches on campaignId change
+    │   └── useMasjidConnect.ts          # Fetches /api/client/masjid-connect; returns { data: MasjidConnectData, isLoading }
     ├── types/
-    │   └── reports.ts                   # TS interfaces: SummaryReport, DeviceRow, DomainRow, AppRow (includes app_id: string|null), SiteBreakdown, CreativeRow, ConversionReport, Campaign, Client
+    │   └── reports.ts                   # TS interfaces: SummaryReport, DeviceRow, DomainRow, AppRow, SiteBreakdown, CreativeRow, ConversionReport, Campaign, Client, MasjidEntry, MasjidConnectData
     ├── lib/
     │   ├── api.ts
-    │   └── dateUtils.ts                 # getDefaultDateRange, formatDate, formatNumber, formatCTR, getPacingPercentage
+    │   └── dateUtils.ts                 # getDefaultDateRange, formatDate, formatNumber, formatCTR, formatConversions
     ├── components/
     │   ├── layout/
     │   │   └── RouteGuard.tsx
     │   └── dashboard/
     │       ├── StatCard.tsx             # label + value card
     │       ├── DateRangePicker.tsx      # Preset buttons + custom date inputs
-    │       ├── PacingBar.tsx            # Impression pacing bar; uses dedicated /api/reports/pacing data (not date-range); info tooltip explains independence; label shows delivered%/expected%/as-of-today
     │       ├── CampaignSwitcher.tsx     # Horizontal pill tabs for multi_campaign clients; only renders when client_type=multi_campaign && campaigns>1
     │       ├── DeviceBreakdownChart.tsx # Recharts doughnut chart; colored by device type; custom tooltip; legend with % share
     │       ├── DomainBreakdownCards.tsx # Top-10 card grid (2-col desktop); impression share bar; "View All" modal with search
@@ -144,7 +149,8 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
     │       ├── OffersStack.tsx          # Renders first banner + "+N more" expand pill; uses OfferBanner
     │       ├── CampaignHealthScore.tsx  # Stat card style (matches StatCard); gold icon bg; score/100 + label badge; info tooltip; visibility toggle props
     │       ├── SinceLastVisit.tsx       # Shows last visit relative time + campaign progress bar
-    │       └── BenchmarkBadge.tsx       # CTR vs network average pill (above/below)
+    │       ├── BenchmarkBadge.tsx       # CTR vs network average pill (above/below)
+    │       └── MasjidConnectSection.tsx # Dual-state: showcase (grid of masjid cards + lightbox) when enabled+data, else marketing fallback card (gradient green, gold CTA buttons)
     ├── components/
     │   └── ui/
     │       ├── Toast.tsx               # Toast component + useToast() hook (showToast, ToastContainer); auto-dismisses 2s
@@ -217,6 +223,7 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 | `client_visits` | Per-user visit log for "since last visit" tracking; 1h debounce in me() |
 | `reporting_password_resets` | Password reset tokens — email, sha256-hashed token, created_at. TTL 60 min, single-use. |
 | `client_display_names` | Rename rules for domains/apps; client_id nullable (null=global); unique(client_id, section, original_key) |
+| `masjid_connects` | Masjid screen placements per client; client_id FK, masjid_name, city, country, screen_photo_path, is_active, sort_order |
 | `admin_audit_log` | Audit trail for admin actions, including impersonation |
 | `personal_access_tokens` | Sanctum API tokens |
 | `sessions` | Redis-backed sessions (table exists as fallback schema) |
@@ -273,13 +280,17 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 | GET | `/api/admin/display-names` | List rename rules; filters: section, client_id (pass "null" for global-only) |
 | POST | `/api/admin/display-names` | Upsert rename rule (client_id, section, original_key, display_name) |
 | DELETE | `/api/admin/display-names/{id}` | Delete rename rule |
+| GET | `/api/admin/masjid-connect/{client_id}` | List masjid entries for client (sorted by sort_order) |
+| POST | `/api/admin/masjid-connect/{client_id}` | Create masjid entry (multipart, photo required) |
+| PUT | `/api/admin/masjid-connect/{client_id}/{id}` | Update masjid entry (photo optional) |
+| DELETE | `/api/admin/masjid-connect/{client_id}/{id}` | Delete masjid entry + photo file |
+| POST | `/api/admin/clients/{id}/toggle-masjidconnect` | Toggle masjidconnect_enabled on client |
 
 ### Client only (sanctum + role:client)
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/client/test` | Client access test |
 | GET | `/api/reports/campaigns` | List client's campaigns |
-| GET | `/api/reports/pacing` | Pacing data from campaign start to today — date-range independent. Returns `{ impressions, contracted, start_date, end_date, as_of }` or `{ available: false }` |
 | GET | `/api/reports/summary` | Summary report (impressions, clicks, CTR) |
 | GET | `/api/reports/device` | Device breakdown |
 | GET | `/api/reports/site` | Site breakdown |
@@ -289,10 +300,10 @@ A client-facing reporting portal for Muslim Ad Network. Clients log in (via Umma
 | GET | `/api/client/visibility` | Returns grouped visibility settings for the authenticated client |
 | GET | `/api/client/offers` | Returns active non-dismissed offers (manual + intelligent) for user's client |
 | POST | `/api/client/offers/{id}/dismiss` | Record offer dismissal; `{id}` can be integer (manual) or `"intelligent_{trigger}"` (intelligent) |
+| GET | `/api/client/masjid-connect` | Returns `{ enabled: bool, masjids: [] }` — only active entries, sorted by sort_order |
 | GET | `/api/reports/campaign-summary/pdf` | Download full campaign PDF report (client + admin; no role restriction beyond auth) — backend exists but frontend button removed in 8.5.1 |
 
 > Report endpoints accept query params: `date_from` (Y-m-d), `date_to` (Y-m-d), and optionally `campaign_id` (required for multi_campaign clients).
-> `/api/reports/pacing` only accepts optional `campaign_id` — it ignores date range and always uses campaign `start_date` → today.
 
 ---
 
@@ -383,6 +394,10 @@ Admins can hide/show entire sections or individual table rows per client while i
 > Session 8.8 — Display names, data merge, health score removal: (1) Display Name system: client_display_names table + ClientDisplayName model + DisplayNameService (singleton; applyToRows fetches all rules in one query, applies client override > global). Admin DisplayNameController (GET/POST/DELETE /api/admin/display-names). ReportController::site() applies display names to domain + app rows before returning. Admin display-names page with Add Rule modal (section radio, original/display inputs, live preview, global/per-client scope dropdown). TagIcon in sidebar between Visibility and Offers. (2) muslimadnetwork.com merge: CM360Service normalizeSiteBreakdown() finds muslimadnetwork.com in domains → merges impressions+clicks into Prayer Times app (case-insensitive partial match on "prayer") → removes from domains → re-sorts apps by impressions. (3) Removed health_score/health_label from ReportController::summary() and SummaryReport TS type. CampaignHealthScore stat card removed from dashboard grid. stat_health removed from visibility page STAT_CARDS. Summary grid changed to lg:grid-cols-4 with 4 skeleton cards. (4) CM360 API upgraded: download URL updated from deprecated v4 (www.googleapis.com) to v5 (dfareporting.googleapis.com) — PHP library already uses v5, only the manual download URL was behind.
 >
 > Session 8.8.1 — Modal portal fix: DomainBreakdownCards, AppBreakdownCards, CreativeBreakdownGrid, and CreativePreviewModal now use React createPortal to mount modals on document.body instead of inside the component tree. z-index set to 9999, position fixed. Prevents modals from being clipped by parent overflow or stacking context.
+>
+> Session 8.7.1 — Remove end_date and pacing bar: (1) Migration drops end_date from campaigns table. Removed from Campaign model/fillable/casts, CampaignController validation, IntelligentOfferService (triggers 1 & 2 removed), CampaignSummaryController (uses Carbon::today() instead), ReportController (pacing() method deleted, end_date removed from campaigns() select). Pacing route removed from api.php. (2) Frontend: end_date removed from Campaign interface, admin campaigns page (interface, emptyForm, openEdit, table, modal form collapsed to single Start Date). PacingBar.tsx deleted. pacingData state/useEffect/import removed from dashboard. getPacingPercentage() removed from dateUtils. pacing removed from visibility SECTIONS. (3) RouteGuard "Loading…" replaced with branded LoadingScreen: animated progress bar 0→88% during auth check, with percentage counter and brand text.
+>
+> Session 8.9 — MasjidConnect feature: (1) Backend: masjidconnect_enabled boolean on clients table (default false). New masjid_connects table (client_id FK, masjid_name, city, country, screen_photo_path, is_active, sort_order). MasjidConnect model. Client model updated (fillable, cast, hasMany). Admin MasjidConnectController: CRUD for masjid entries + toggle-masjidconnect. Client MasjidConnectController: GET /api/client/masjid-connect → {enabled, masjids[]} (active only). Photos stored on public disk in masjid-screens/ folder. (2) Admin frontend: clients page has gold toggle switch per row + "Manage" link when enabled. New /admin/masjid-connect overview page. New /admin/masjid-connect/[clientId] management page with photo upload, edit, delete, sort order. MasjidConnect nav link (mosque icon) in sidebar between Display Names and Offers. (3) Client dashboard: MasjidConnectSection shows showcase (grid + lightbox with ESC/arrow navigation) when enabled+data exists, else marketing fallback card (green gradient, gold CTA). Always rendered. useMasjidConnect hook. Visibility toggle key: masjidconnect. MasjidEntry + MasjidConnectData types added.
 >
 > Session 8.2.1 — Islamic design refinement: (1) Gold reduced to borders only — StatCard uses 4-sided gold border (1px solid #C9A84C), icon backgrounds revert to colored (blue/emerald/purple), hover is now translateY(-3px) + shadow instead of gold glow. (2) PacingBar "on pace" badge: white bg + gold border + gold text; bar fill changed from gold to green #10b981. (3) CampaignSwitcher active pill: removed gold border, uses inset box-shadow for subtle gold left accent; inactive pills hover adds gold border + scale(1.02). (4) OfferBanner: solid dark green #1a4a2e bg + 2px gold border; CTA button white bg with dark green text + gold border. (5) Header gold border opacity reduced to 0.4. (6) "Campaign Performance" heading: removed gradient text, plain dark. (7) IslamicDivider opacity 0.6→0.35, stroke-width 0.7→0.5. (8) IslamicWatermark SVG component created — fixed full-page 8-pointed star geometric tile pattern, opacity 0.025, z-index 0, color #1a4a2e; added to dashboard/layout.tsx. (9) Domain/App breakdown cards: added 1px #e5e7eb border, hover gets gold border + translateY(-2px). (10) Creative cards: added 1px #e5e7eb border, hover gets gold border + translateY(-3px). (11) SectionCard: hover increases box-shadow.
 

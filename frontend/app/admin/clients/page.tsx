@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, FormEvent } from 'react'
+import Link from 'next/link'
 import api from '@/lib/api'
 
 interface Client {
@@ -9,6 +10,7 @@ interface Client {
   client_type: string
   is_active: boolean
   intelligent_offers_enabled: boolean
+  masjidconnect_enabled: boolean
   primary_color: string | null
   notes: string | null
   users_count: number
@@ -104,6 +106,15 @@ export default function ClientsPage() {
     }
   }
 
+  const handleToggleMasjidConnect = async (clientId: number) => {
+    try {
+      const { data } = await api.post(`/api/admin/clients/${clientId}/toggle-masjidconnect`)
+      setClients(prev => prev.map(c => c.id === clientId ? { ...c, masjidconnect_enabled: data.masjidconnect_enabled } : c))
+    } catch {
+      alert('Could not toggle MasjidConnect.')
+    }
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -130,6 +141,7 @@ export default function ClientsPage() {
                 <th className="text-left px-5 py-3 text-xs font-semibold text-[#64748b] uppercase tracking-wide">Status</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold text-[#64748b] uppercase tracking-wide">Campaigns</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold text-[#64748b] uppercase tracking-wide">Users</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-[#64748b] uppercase tracking-wide">MasjidConnect</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold text-[#64748b] uppercase tracking-wide">Actions</th>
               </tr>
             </thead>
@@ -157,6 +169,32 @@ export default function ClientsPage() {
                   <td className="px-5 py-3 text-[#64748b]">{c.campaigns_count}</td>
                   <td className="px-5 py-3 text-[#64748b]">{c.users_count}</td>
                   <td className="px-5 py-3">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={c.masjidconnect_enabled}
+                        onClick={() => handleToggleMasjidConnect(c.id)}
+                        className="flex-shrink-0 w-9 h-5 rounded-full transition-colors duration-200"
+                        style={{ backgroundColor: c.masjidconnect_enabled ? '#C9A84C' : '#e2e8f0' }}
+                      >
+                        <div
+                          className="w-3.5 h-3.5 bg-white rounded-full shadow transition-transform duration-200"
+                          style={{ transform: c.masjidconnect_enabled ? 'translateX(19px)' : 'translateX(2px)', marginTop: '3px' }}
+                        />
+                      </button>
+                      {c.masjidconnect_enabled && (
+                        <Link
+                          href={`/admin/masjid-connect/${c.id}`}
+                          className="text-xs font-semibold px-3 py-1 rounded-full"
+                          style={{ backgroundColor: '#fef9ec', color: '#92640a' }}
+                        >
+                          Manage
+                        </Link>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-5 py-3">
                     <div className="flex gap-2">
                       <button onClick={() => openEdit(c)} className="text-xs font-semibold px-3 py-1 rounded-full" style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}>Edit</button>
                       <button onClick={() => handleImpersonate(c.id)} className="text-xs font-semibold px-3 py-1 rounded-full" style={{ backgroundColor: '#faf5ff', color: '#7c3aed' }}>Impersonate</button>
@@ -168,7 +206,7 @@ export default function ClientsPage() {
                 </tr>
               ))}
               {clients.length === 0 && (
-                <tr><td colSpan={6} className="px-5 py-10 text-center text-[#64748b]">No clients yet.</td></tr>
+                <tr><td colSpan={7} className="px-5 py-10 text-center text-[#64748b]">No clients yet.</td></tr>
               )}
             </tbody>
           </table>

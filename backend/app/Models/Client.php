@@ -16,6 +16,7 @@ class Client extends Model
         'is_active',
         'features',
         'intelligent_offers_enabled',
+        'masjidconnect_enabled',
         'notes',
     ];
 
@@ -25,6 +26,7 @@ class Client extends Model
             'features' => 'array',
             'is_active' => 'boolean',
             'intelligent_offers_enabled' => 'boolean',
+            'masjidconnect_enabled' => 'boolean',
             'client_type' => ClientType::class,
         ];
     }
@@ -37,5 +39,10 @@ class Client extends Model
     public function campaigns(): HasMany
     {
         return $this->hasMany(Campaign::class);
+    }
+
+    public function masjidConnects(): HasMany
+    {
+        return $this->hasMany(MasjidConnect::class);
     }
 }

@@ -29,7 +29,8 @@ const SECTIONS: { key: string; label: string; hasRows: boolean }[] = [
   { key: 'domain',     label: 'Domain Breakdown',  hasRows: true  },
   { key: 'app',        label: 'App Breakdown',      hasRows: true  },
   { key: 'creative',   label: 'Creative Breakdown', hasRows: true  },
-  { key: 'conversion', label: 'Conversion',         hasRows: false },
+  { key: 'conversion',     label: 'Conversion',            hasRows: false },
+  { key: 'masjidconnect', label: 'MasjidConnect Section', hasRows: false },
 ]
 
 const STAT_CARDS: { key: string; label: string; description: string }[] = [
