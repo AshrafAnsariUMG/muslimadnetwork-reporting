@@ -9,7 +9,6 @@ interface Client {
   name: string
   client_type: string
   is_active: boolean
-  intelligent_offers_enabled: boolean
   masjidconnect_enabled: boolean
   primary_color: string | null
   notes: string | null
@@ -22,7 +21,6 @@ const emptyForm = {
   client_type: 'standard',
   primary_color: '#1a4a2e',
   notes: '',
-  intelligent_offers_enabled: false,
 }
 
 // ─── Shared input/select styles ───────────────────────────────────────────────
@@ -61,7 +59,6 @@ export default function ClientsPage() {
       client_type: c.client_type,
       primary_color: c.primary_color ?? '#1a4a2e',
       notes: c.notes ?? '',
-      intelligent_offers_enabled: c.intelligent_offers_enabled ?? false,
     })
     setError('')
     setModalOpen(true)
@@ -253,26 +250,6 @@ export default function ClientsPage() {
               <div>
                 <label className="block text-xs font-semibold text-[#64748b] mb-1.5">Notes</label>
                 <textarea rows={3} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} className={inputCls + ' resize-none'} />
-              </div>
-
-              <div className="flex items-start gap-3 p-3 rounded-xl" style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={form.intelligent_offers_enabled}
-                  onClick={() => setForm(f => ({ ...f, intelligent_offers_enabled: !f.intelligent_offers_enabled }))}
-                  className="flex-shrink-0 w-10 h-5 rounded-full transition-colors duration-200 mt-0.5"
-                  style={{ backgroundColor: form.intelligent_offers_enabled ? '#1a4a2e' : '#e2e8f0' }}
-                >
-                  <div
-                    className="w-4 h-4 bg-white rounded-full shadow transition-transform duration-200"
-                    style={{ transform: form.intelligent_offers_enabled ? 'translateX(22px)' : 'translateX(2px)', marginTop: '2px' }}
-                  />
-                </button>
-                <div>
-                  <p className="text-xs font-semibold text-gray-900">Intelligent Offers</p>
-                  <p className="text-xs text-[#64748b] mt-0.5">Automatically show performance-triggered upsell offers in this client&apos;s dashboard</p>
-                </div>
               </div>
 
               <div className="flex justify-end gap-3 pt-2">

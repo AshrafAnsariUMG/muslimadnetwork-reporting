@@ -179,7 +179,7 @@ function MarketingFallback() {
 
       <div className="flex items-center justify-center gap-3 flex-wrap mb-6">
         <a
-          href="https://calendly.com/muslimadnetwork"
+          href="https://muslimadnetwork.pipedrive.com/scheduler/9KmA9sa/muslim-ad-network-advertising-partnership-next-steps"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-block px-6 py-2.5 text-sm font-semibold rounded-full transition-opacity hover:opacity-90"
