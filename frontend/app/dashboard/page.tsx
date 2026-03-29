@@ -27,7 +27,6 @@ import { useMasjidConnect } from '@/hooks/useMasjidConnect'
 import { Skeleton } from '@/components/ui/Skeleton'
 import StatCardSkeleton from '@/components/ui/StatCardSkeleton'
 import { MosqueIcon } from '@/components/ui/IslamicIcons'
-import CampaignSuccessBox from '@/components/dashboard/CampaignSuccessBox'
 import api from '@/lib/api'
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
@@ -358,23 +357,6 @@ function DashboardContent() {
         <div className="fade-in-up" style={{ animationDelay: '100ms' }}>
           <DateRangePicker dateFrom={dateFrom} dateTo={dateTo} onDateChange={handleDateChange} />
         </div>
-
-        {/* Campaign Success Manager box */}
-        {selectedCampaign && (
-          <div className="fade-in-up" style={{ animationDelay: '120ms' }}>
-            <CampaignSuccessBox
-              campaignName={selectedCampaign.name}
-              impressions={summary.data?.impressions ?? 0}
-              clicks={summary.data?.clicks ?? 0}
-              ctr={summary.data?.ctr ?? 0}
-              muslimReach={Math.round((summary.data?.impressions ?? 0) / 5)}
-              networkAvgCtr={summary.data?.network_avg_ctr ?? 0.05}
-              startDate={selectedCampaign.start_date}
-              clientName={client?.name ?? ''}
-              isLoading={summary.isLoading}
-            />
-          </div>
-        )}
 
         {/* Summary stat cards */}
         {(isImpersonating || !isHidden('summary')) && (

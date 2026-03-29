@@ -139,7 +139,6 @@ frontend/
     VisibilityToggle.tsx        eye/eye-off; only when impersonation_token in localStorage
     OfferBanner.tsx             single offer; dark green bg + gold border; fade on dismiss
     OffersStack.tsx             first banner + "+N more" pill
-    CampaignSuccessBox.tsx      "Nadia" persona card; CTR/impressions/upsell message; mailto CTA
     CampaignHealthScore.tsx     legacy stat card (kept but removed from dashboard grid in 8.8)
     MasjidConnectSection.tsx    showcase (grid + lightbox) or marketing fallback
     BenchmarkBadge.tsx          CTR vs network average pill
@@ -383,6 +382,8 @@ chown -R claude-dev:claude-dev /var/www/muslimadnetwork-reporting/frontend
 ## Notes
 
 - Onboarding email subject: "You're live on Muslim Ad Network 🚀" (updated in 8.12)
-- Email layout rebranded in 8.12: primary blue #176293, green #A5B300, gold #C9A84C; logo via asset('logo.jpeg') (backend/public/logo.jpeg)
-- `logo.jpeg` lives in both `frontend/public/logo.jpeg` and `backend/public/logo.jpeg` (copied in 8.12 for email asset() use)
+- Email layout rebranded in 8.12: primary blue #176293, green #A5B300, gold #C9A84C; logo embedded as base64 data URI (backend/public/logo.jpeg)
+- `logo.jpeg` lives in both `frontend/public/logo.jpeg` and `backend/public/logo.jpeg` (copied in 8.12 for email use)
 - OnboardingController sets password permanently — no expiry, no reset token; just `Hash::make()` on the user record
+- CampaignSuccessBox removed in 8.13 — file deleted, import + JSX removed from dashboard/page.tsx
+- Password visibility toggle added in 8.13 — login/page.tsx and reset-password/page.tsx
