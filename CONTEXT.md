@@ -739,6 +739,8 @@ components/
 
 ## 12. Session History
 
+### Summary Table
+
 | Session | Key Changes |
 |---------|-------------|
 | 8.2 | Islamic design elements added (gold CSS vars, IslamicDivider, gold borders/gradients) |
@@ -756,6 +758,72 @@ components/
 | 8.9.1 | MasjidConnect per-campaign support (campaign_id FK, admin tabs, client filtering) |
 | 8.10 | Skeleton loading states for all dashboard sections; MosqueIcon redesign (filled SVG, IslamicIcons.tsx) |
 | 8.11 | Removed IntelligentOfferService; new CampaignSuccessBox ("Nadia" persona); Pipedrive URL fix |
+| 8.12 | Onboarding email rebranded (new layout, new copy, new subject); logo added to backend/public/ |
+
+### Detailed Session Notes
+
+**Session 8.2** — Islamic design elements added to client dashboard: gold CSS variables (--gold, --gold-light, --gold-dark), IslamicDivider SVG component (8-pointed star pattern), gold top border + gradient icon on StatCards, gold pacing bar (on-pace state), gold-bordered campaign switcher active pill, green-to-gold offer banner gradient, gold section heading underlines with star icons, Bismillah calligraphy in header, gold header border.
+
+**Session 8.2.1** — Islamic design refinement: (1) Gold reduced to borders only — StatCard uses 4-sided gold border (1px solid #C9A84C), icon backgrounds revert to colored (blue/emerald/purple), hover is now translateY(-3px) + shadow instead of gold glow. (2) CampaignSwitcher active pill: removed gold border, uses inset box-shadow for subtle gold left accent; inactive pills hover adds gold border + scale(1.02). (3) OfferBanner: solid dark green #1a4a2e bg + 2px gold border; CTA button white bg with dark green text + gold border. (4) Header gold border opacity reduced to 0.4. (5) "Campaign Performance" heading: removed gradient text, plain dark. (6) IslamicDivider opacity 0.6→0.35, stroke-width 0.7→0.5. (7) IslamicWatermark SVG component created — fixed full-page 8-pointed star geometric tile pattern, opacity 0.025, z-index 0, color #1a4a2e; added to dashboard/layout.tsx. (8) Domain/App breakdown cards: added 1px #e5e7eb border, hover gets gold border + translateY(-2px). (9) Creative cards: added 1px #e5e7eb border, hover gets gold border + translateY(-3px). (10) SectionCard: hover increases box-shadow.
+
+**Session 8.3** — Campaign intelligence: client_visits table + AuthController me() records visits with 1h debounce + returns last_visited_at. Summary endpoint adds network_avg_ctr, ctr_vs_benchmark, health_score, health_label. CampaignHealthScore, SinceLastVisit, BenchmarkBadge components. Top Performer badge on highest-CTR creative. StatCard accepts ctrVsBenchmark prop.
+
+**Session 8.4** — Intelligent offers: intelligent_offers_enabled flag on clients (admin toggle in UI). IntelligentOfferService with 4 performance triggers (behind pace, ending soon, strong CTR, just started). Separate intelligent_offer_dismissals table. PDF report: barryvdh/laravel-dompdf, CampaignSummaryController, 6-page Blade PDF (cover, executive summary, device, domains/apps, creatives, closing). "Download Report" gold button in dashboard header.
+
+**Session 8.5** — Creative evaluation: CreativeEvaluationService injected into ReportController::creative(). Adds performance_status (top_performer/strong/average/refresh_opportunity/ready_for_refresh/insufficient_data), vs_campaign_avg %, vs_network_avg %, fatigue_risk bool, recommendation string. When fatigue_risk=true, performance_status is overridden to ready_for_refresh. CreativeBreakdownGrid: status badges (⭐💪💡🔄), recommendation tooltip (ℹ️), vs-campaign-avg line (positive only), InsightsSummary filter row ("⭐ X leading creatives", "💡 X refresh opportunities", clear filter). CreativePreviewModal: evaluation section with status badge, positive-only benchmark pills, blue/purple refresh info boxes, gold box for top_performer.
+
+**Session 8.5.1** — Dashboard UI fixes: (1) Removed "Download Report" PDF button and related state/handler from dashboard/page.tsx. (2) Redesigned CampaignHealthScore as a stat card matching StatCard style — gold icon bg, heart-pulse icon, score/100 value, label badge, info tooltip, visibility toggle props. (3) Added MuslimReach stat card (value = impressions ÷ 5, mosque icon, info tooltip). (4) Per-card visibility toggles on all 6 stat cards: stat_impressions, stat_clicks, stat_ctr, stat_muslimreach, stat_health, stat_conversions — eye icon top-right of each card when impersonating; hidden+impersonating = 0.3 opacity; hidden+not impersonating = null. Summary grid changed to grid-cols-1 sm:grid-cols-2 lg:grid-cols-3. StatCard gains isImpersonating, isHidden, onVisibilityToggle, infoTooltip props. CampaignHealthScore moved into the summary grid (no longer a separate section below).
+
+**Session 8.6** — App icons in breakdown cards: Added `appId` dimension to CM360 site report (buildSiteReport). normalizeSiteBreakdown now extracts app_id per row (null if "(not set)"), stored in app bucket and included in apps[] output. AppRow interface gains app_id: string|null. New AppIcon.tsx component: fetches /api/app-icon (server-side Play Store og:image scrape) with gradient letter avatar fallback. AppBreakdownCards uses AppIcon replacing the letter avatar. New backend: AppIconService (scrapes og:image+og:title from Play Store), AppIconCache model+migration (bundle_id unique, 7-day TTL), AppIconController (GET /api/app-icon, auth:sanctum, Cache-Control 7d), singleton in AppServiceProvider.
+
+**Session 8.7** — Favicon + admin mobile responsive: (1) Favicon: copied logo.jpeg to app/icon.jpeg, app/apple-icon.jpeg, app/favicon.ico — Next.js file convention serves these automatically; removed manual metadata icons. (2) Admin layout already had mobile sidebar (collapsible with hamburger + backdrop). (3) All admin tables wrapped in overflow-x-auto for horizontal scrolling on mobile: admin/page.tsx (clients overview), clients/page.tsx, users/page.tsx, campaigns/page.tsx, offers/page.tsx. Table min-w-full ensures columns don't collapse.
+
+**Session 8.7.1** — Remove end_date and pacing bar: (1) Migration drops end_date from campaigns table. Removed from Campaign model/fillable/casts, CampaignController validation, CampaignSummaryController (uses Carbon::today() instead), ReportController (pacing() method deleted, end_date removed from campaigns() select). Pacing route removed from api.php. (2) Frontend: end_date removed from Campaign interface, admin campaigns page (interface, emptyForm, openEdit, table, modal form collapsed to single Start Date). PacingBar.tsx deleted. pacingData state/useEffect/import removed from dashboard. getPacingPercentage() removed from dateUtils. pacing removed from visibility SECTIONS. (3) RouteGuard "Loading…" replaced with branded LoadingScreen: animated progress bar 0→88% during auth check, with percentage counter and brand text.
+
+**Session 8.8** — Display names, data merge, health score removal: (1) Display Name system: client_display_names table + ClientDisplayName model + DisplayNameService (singleton; applyToRows fetches all rules in one query, applies client override > global). Admin DisplayNameController (GET/POST/DELETE /api/admin/display-names). ReportController::site() applies display names to domain + app rows before returning. Admin display-names page with Add Rule modal (section radio, original/display inputs, live preview, global/per-client scope dropdown). TagIcon in sidebar between Visibility and Offers. (2) muslimadnetwork.com merge: CM360Service normalizeSiteBreakdown() finds muslimadnetwork.com in domains → merges impressions+clicks into Prayer Times app (case-insensitive partial match on "prayer") → removes from domains → re-sorts apps by impressions. (3) Removed health_score/health_label from ReportController::summary() and SummaryReport TS type. CampaignHealthScore stat card removed from dashboard grid. stat_health removed from visibility page STAT_CARDS. Summary grid changed to lg:grid-cols-4 with 4 skeleton cards. (4) CM360 API upgraded: download URL updated from deprecated v4 (www.googleapis.com) to v5 (dfareporting.googleapis.com) — PHP library already uses v5, only the manual download URL was behind.
+
+**Session 8.8.1** — Modal portal fix: DomainBreakdownCards, AppBreakdownCards, CreativeBreakdownGrid, and CreativePreviewModal now use React createPortal to mount modals on document.body instead of inside the component tree. z-index set to 9999, position fixed. Prevents modals from being clipped by parent overflow or stacking context.
+
+**Session 8.9** — MasjidConnect feature: (1) Backend: masjidconnect_enabled boolean on clients table (default false). New masjid_connects table (client_id FK, masjid_name, city, country, screen_photo_path, is_active, sort_order). MasjidConnect model. Client model updated (fillable, cast, hasMany). Admin MasjidConnectController: CRUD for masjid entries + toggle-masjidconnect. Client MasjidConnectController: GET /api/client/masjid-connect → {enabled, masjids[]} (active only). Photos stored on public disk in masjid-screens/ folder. (2) Admin frontend: clients page has gold toggle switch per row + "Manage" link when enabled. New /admin/masjid-connect overview page. New /admin/masjid-connect/[clientId] management page with photo upload, edit, delete, sort order. MasjidConnect nav link (mosque icon) in sidebar between Display Names and Offers. (3) Client dashboard: MasjidConnectSection shows showcase (grid + lightbox with ESC/arrow navigation) when enabled+data exists, else marketing fallback card (green gradient, gold CTA). Always rendered. useMasjidConnect hook. Visibility toggle key: masjidconnect. MasjidEntry + MasjidConnectData types added.
+
+**Session 8.9.1** — MasjidConnect per-campaign support: (1) Backend: Added campaign_id (nullable FK → campaigns, nullOnDelete) to masjid_connects table. MasjidConnect model gains campaign_id in fillable/casts + nullable belongsTo Campaign. Admin controller: index() accepts optional campaign_id filter; store/update validate campaign_id belongs to client; campaign name eager-loaded and included in response. Client controller: if campaign_id query param provided, returns entries matching that campaign OR campaign_id IS NULL (global entries); without param returns all. (2) Admin [clientId] page: fetches client_type and campaigns list; multi_campaign clients see campaign pill tabs (All Campaigns + one per campaign, each with count badge); active tab filters the grid; Add/Edit modal shows Campaign dropdown for multi_campaign clients defaulting to current tab; campaign badge shown on each card. (3) Client dashboard: useMasjidConnect now accepts campaignId param, passes as query param, refetches on campaign change. dashboard/page.tsx passes campaignId to the hook.
+
+**Session 8.10** — Skeleton loading states + MosqueIcon redesign: (1) globals.css: shimmer keyframe + `.skeleton-shimmer` class (gradient sweep animation). (2) New `components/ui/Skeleton.tsx`: reusable shimmer div. (3) New `components/ui/StatCardSkeleton.tsx`: matches StatCard layout (gold border, icon/label/value placeholders). (4) New `components/ui/IslamicIcons.tsx`: exports `MosqueIcon` — proper filled mosque silhouette SVG (two minarets with pointed caps + balcony rings, central cubic-bezier dome, rectangular building base, hilal crescent via evenodd fill on two full-circle paths); viewBox 0 0 24 24, fill currentColor. (5) dashboard/page.tsx: stat cards use StatCardSkeleton (4 cards); device section uses donut-ring + 4 legend-row skeleton; domain/app sections use 4-card grid skeleton (icon+text+bar per card); creative section uses Skeleton-based card grid; MosqueStatIcon now fills from IslamicIcons. (6) MasjidConnectSection loading skeleton replaced with 3 masjid card skeletons (image area + text rows). (7) MosqueIcon updated everywhere (MasjidConnectSection, admin layout sidebar, admin/masjid-connect overview, admin/masjid-connect/[clientId]) — all now import from IslamicIcons, removing all local stroke-based MosqueIcon definitions.
+
+**Session 8.12** — Onboarding email overhaul: (1) Confirmed no expiry logic on onboarding passwords — password is saved as permanent bcrypt hash via `Hash::make()` directly on the user record; no reset token or expiry table entry is created. (2) Rebuilt `layout.blade.php` with new brand colors: primary blue #176293, green #A5B300, gold #C9A84C; header now shows logo image + "Muslim Ad Network" + thin gold separator line; content card has 4px green top border; footer is blue with gold links; copyright includes "A property of Ummah Media Group LLC". (3) Replaced `onboarding.blade.php` content entirely: new subject "You're live on Muslim Ad Network 🚀"; new copy with As-salamu alaykum greeting; 3-item icon bullet table (📊📎📬); credentials box styled with #f0f7ff background + #176293 left border; CTA button uses new blue #176293; closing paragraph + "Warm regards" sign-off. (4) Added `logoUrl => asset('logo.jpeg')` to OnboardingController view data; copied `logo.jpeg` from `frontend/public/` to `backend/public/`. (5) Also added `logoUrl` to PasswordResetController view data so reset email also shows logo. (6) `reset_password.blade.php` unchanged — it already extends `emails.layout` and inherits new branding automatically.
+
+**Session 8.11** — Remove intelligent offers + CampaignSuccessBox: (1) MasjidConnect "Book a Free Consultation" href updated to Pipedrive scheduler URL. (2) IntelligentOfferService.php deleted. OfferController simplified: removed IntelligentOfferService dependency, intelligent_offer_dismissals handling, and intelligent_* dismiss prefix logic — only returns manual admin-created offers. Client offer routes (GET /api/client/offers, POST /api/client/offers/{id}/dismiss) kept. Admin offers management (/admin/offers) kept. (3) admin/clients/page.tsx: removed intelligent_offers_enabled from Client interface, emptyForm, openEdit, and the toggle UI block. (4) New CampaignSuccessBox.tsx component: white card, 4px green left border, "SM" avatar, Nadia message built from real campaign data (opener + performance line based on CTR vs network avg + reach line + upsell line based on impressions), mailto CTA button "Add More Impressions". Skeleton loading state. Placed in dashboard below DateRangePicker and above stat cards; refetches/rerenders on campaign/date change.
+
+---
+
+## 14. Pending Work
+
+### Session 8.7.2 — Muslim Branding Additions
+Planned additions to strengthen Islamic identity across the portal. Exact scope TBD.
+
+### Session 9 — DNS Cutover and Launch Prep
+Portal is currently running on bare IP (37.27.215.90). DNS cutover to production domain pending. Will require updating `APP_URL`, `FRONTEND_URL`, `CORS_ALLOWED_ORIGINS`, `SANCTUM_STATEFUL_DOMAINS`, and `UMMAHPASS_REDIRECT_URI` in `.env`. UmmahPass OAuth credentials also need to be configured before SSO goes live.
+
+### AI Campaign Success Manager Upgrade
+The current `CampaignSuccessBox` uses static template-string logic for the "Nadia" persona. A planned upgrade will use the Claude API to generate dynamic, context-aware campaign performance commentary. The component already has the right prop interface (`campaignName`, `impressions`, `clicks`, `ctr`, `muslimReach`, `networkAvgCtr`, `startDate`, `clientName`) — the upgrade is a backend call replacement.
+
+---
+
+## 15. How to Resume Work
+
+When starting a new session:
+1. Read `CLAUDE.md` for operational quick-reference (commands, rules, file map)
+2. Read `CONTEXT.md` for full project understanding (this file)
+3. Check `git log --oneline -10` to see recent commits
+4. If picking up mid-task, check for any in-progress branches or uncommitted changes
+
+Key things to verify before starting backend work:
+- Run `php artisan route:list --path=api` to confirm routes are registered
+- Run `php artisan migrate:status` to confirm migrations are current
+
+Key things to verify before starting frontend work:
+- Check `frontend/.env` has correct `NEXT_PUBLIC_API_URL`
+- Check `.next/` ownership — must be owned by the PM2 process user (not root)
 
 ---
 

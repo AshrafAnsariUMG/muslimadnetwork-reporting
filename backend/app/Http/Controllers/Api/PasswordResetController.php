@@ -13,6 +13,15 @@ use Illuminate\Support\Facades\Log;
 
 class PasswordResetController extends Controller
 {
+    private static function logoDataUri(): string
+    {
+        $path = public_path('logo.jpeg');
+        if (!file_exists($path)) {
+            return '';
+        }
+        return 'data:image/jpeg;base64,' . base64_encode(file_get_contents($path));
+    }
+
     public function forgotPassword(Request $request): JsonResponse
     {
         $request->validate([
@@ -49,6 +58,7 @@ class PasswordResetController extends Controller
                 'name'      => $user->name,
                 'resetUrl'  => $resetUrl,
                 'expiresIn' => 60,
+                'logoUrl'   => self::logoDataUri(),
             ])->render();
 
             app(GmailMailerService::class)->send($email, 'Reset your Muslim Ad Network password', $html);

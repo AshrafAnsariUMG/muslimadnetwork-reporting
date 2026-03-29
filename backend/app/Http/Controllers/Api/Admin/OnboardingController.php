@@ -14,6 +14,15 @@ use Illuminate\Support\Str;
 
 class OnboardingController extends Controller
 {
+    private static function logoDataUri(): string
+    {
+        $path = public_path('logo.jpeg');
+        if (!file_exists($path)) {
+            return '';
+        }
+        return 'data:image/jpeg;base64,' . base64_encode(file_get_contents($path));
+    }
+
     public function send(Request $request, int $id): JsonResponse
     {
         $user = User::findOrFail($id);
@@ -33,11 +42,12 @@ class OnboardingController extends Controller
                 'email'    => $user->email,
                 'password' => $newPassword,
                 'loginUrl' => $loginUrl,
+                'logoUrl'  => self::logoDataUri(),
             ])->render();
 
             app(GmailMailerService::class)->send(
                 $user->email,
-                'Welcome to Muslim Ad Network — Your Dashboard Access',
+                "You're live on Muslim Ad Network 🚀",
                 $html
             );
         } catch (\Throwable $e) {
