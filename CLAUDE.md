@@ -465,3 +465,45 @@ pm2 logs muslimadnetwork-backend
 3. Do not set up PM2 or Nginx — the user manages that manually.
 4. Backend runs via PHP-FPM behind Nginx on port 8001.
 5. Frontend runs via `next start` on port 3001.
+
+---
+
+## Updated Operational Notes
+
+### PM2 Restart (claude-dev can now do this)
+```bash
+sudo pm2 restart muslimadnetwork-reporting-backend
+sudo pm2 restart muslimadnetwork-reporting-frontend
+sudo pm2 restart muslimadnetwork-reporting-queue
+```
+
+### Frontend Build Ownership Issue
+If `npm run build` fails with EACCES permission denied on `.next` directory:
+- Root must run:
+  ```bash
+  rm -rf /var/www/muslimadnetwork-reporting/frontend/.next
+  chown -R claude-dev:claude-dev /var/www/muslimadnetwork-reporting/frontend
+  ```
+- Then claude-dev runs `npm run build` normally
+- **NEVER run `npm run build` as root** — it causes this ownership problem
+
+### After Every Session
+
+**Backend changes:**
+```bash
+php artisan config:clear && php artisan config:cache
+php artisan route:clear && php artisan route:cache
+sudo pm2 restart muslimadnetwork-reporting-backend
+```
+
+**Frontend changes:**
+```bash
+cd /var/www/muslimadnetwork-reporting/frontend
+npm run build
+sudo pm2 restart muslimadnetwork-reporting-frontend
+```
+
+**Both changed:** Run all of the above.
+
+### Git Is Always Root
+claude-dev never runs git commands. Only root pushes to GitHub. claude-dev says "Ready to push" and waits.
